@@ -27,6 +27,15 @@
 #include <functional>
 #include <QGuiApplication>
 #include <QActionGroup>
+#include <QGridLayout>
+#include <QPlainTextEdit>
+#include <QShortcut>
+#include <QFrame>
+#include <QTextOption>
+#include <QTextDocument>
+#include <QKeyEvent>
+#include <cmath>
+#include <algorithm>
 
 #ifdef HAVE_QDBUS
 #include <QtDBus/QtDBus>
@@ -67,7 +76,11 @@ MainWindow::MainWindow(TerminalConfig &cfg,
       m_config(cfg),
       m_dropLockButton(nullptr),
       m_dropMode(dropMode),
-      m_layerWindow(nullptr)
+      m_layerWindow(nullptr),
+      m_nterminalCompose(false),
+      m_composeRawMode(false),
+      m_composeEdit(nullptr),
+      m_toggleComposeAction(nullptr)
 {
 #ifdef HAVE_QDBUS
     registerAdapter<WindowAdaptor, MainWindow>(this);
@@ -131,6 +144,7 @@ MainWindow::MainWindow(TerminalConfig &cfg,
     consoleTabulator->setAutoFillBackground(true);
     connect(consoleTabulator, &TabWidget::closeLastTabNotification, this, &MainWindow::close);
     consoleTabulator->setTabPosition((QTabWidget::TabPosition)Properties::Instance()->tabsPos);
+    setupComposeInput();
     //consoleTabulator->setShellProgram(command);
 
     const auto menuBarActions = m_menuBar->actions();
@@ -149,6 +163,10 @@ MainWindow::MainWindow(TerminalConfig &cfg,
        the main window; otherwise, the initial prompt might
        get jumbled because of changes in internal geometry. */
     addNewTab(m_config);
+    if (m_nterminalCompose)
+    {
+        setRawInputMode(false);
+    }
 }
 
 void MainWindow::rebuildActions()
@@ -166,6 +184,177 @@ void MainWindow::rebuildActions()
 MainWindow::~MainWindow()
 {
     QTerminalApp::Instance()->removeWindow(this);
+}
+
+void MainWindow::setupComposeInput()
+{
+    const QString appName = QCoreApplication::applicationName().toLower();
+    m_nterminalCompose = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
+        || appName.contains(QStringLiteral("nterminal"));
+    if (!m_nterminalCompose)
+    {
+        return;
+    }
+
+    auto *layout = qobject_cast<QGridLayout*>(centralwidget->layout());
+    if (layout == nullptr)
+    {
+        return;
+    }
+
+    m_composeEdit = new QPlainTextEdit(centralwidget);
+    m_composeEdit->setObjectName(QStringLiteral("composeInput"));
+    m_composeEdit->setFrameShape(QFrame::NoFrame);
+    m_composeEdit->setTabChangesFocus(false);
+    m_composeEdit->setUndoRedoEnabled(true);
+    m_composeEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_composeEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_composeEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    m_composeEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_composeEdit->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
+    m_composeEdit->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
+
+    layout->addWidget(m_composeEdit, 1, 0);
+    layout->setRowStretch(0, 1);
+    layout->setRowStretch(1, 0);
+
+    connect(m_composeEdit->document(), &QTextDocument::contentsChanged,
+            this, &MainWindow::updateComposeHeight);
+
+    QShortcut *sendShortcutReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_composeEdit);
+    connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
+
+    m_toggleComposeAction = new QAction(this);
+    m_toggleComposeAction->setShortcut(QKeySequence(QStringLiteral("F6")));
+    m_toggleComposeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    connect(m_toggleComposeAction, &QAction::triggered, this, [this]() {
+        setRawInputMode(!m_composeRawMode);
+    });
+    addAction(m_toggleComposeAction);
+
+    updateComposeHeight();
+    setRawInputMode(false);
+}
+
+void MainWindow::updateComposeHeight()
+{
+    if (m_composeEdit == nullptr)
+    {
+        return;
+    }
+
+    bool ok = false;
+    int maxLines = qEnvironmentVariableIntValue("NTERMINAL_COMPOSE_MAX_LINES", &ok);
+    if (!ok || maxLines < 2)
+    {
+        maxLines = 8;
+    }
+
+    const qreal docHeight = m_composeEdit->document()->size().height();
+    int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
+    visualLines = std::min(visualLines, maxLines);
+
+    const QFontMetrics fm(m_composeEdit->font());
+    const int padding = 8;
+    const int frame = m_composeEdit->frameWidth() * 2;
+    m_composeEdit->setFixedHeight(frame + padding + (visualLines * fm.lineSpacing()));
+}
+
+void MainWindow::focusActiveTerminal()
+{
+    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
+    {
+        if (TermWidget *term = holder->currentTerminal())
+        {
+            if (TermWidgetImpl *impl = term->impl())
+            {
+                impl->setFocus(Qt::OtherFocusReason);
+            }
+        }
+    }
+}
+
+void MainWindow::setRawInputMode(bool rawMode)
+{
+    if (m_composeEdit == nullptr)
+    {
+        return;
+    }
+
+    m_composeRawMode = rawMode;
+    m_composeEdit->setVisible(!rawMode);
+
+    if (rawMode)
+    {
+        focusActiveTerminal();
+    }
+    else
+    {
+        updateComposeHeight();
+        m_composeEdit->setFocus(Qt::OtherFocusReason);
+    }
+}
+
+void MainWindow::sendComposeToTerminal()
+{
+    if (m_composeEdit == nullptr)
+    {
+        return;
+    }
+
+    QString text = m_composeEdit->toPlainText();
+    if (text.trimmed().isEmpty())
+    {
+        return;
+    }
+
+    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
+    {
+        if (TermWidget *term = holder->currentTerminal())
+        {
+            if (TermWidgetImpl *impl = term->impl())
+            {
+                // Ctrl+Enter can insert a trailing newline in the compose editor before submit.
+                // Keep multiline content, but drop one accidental trailing line break.
+                if (text.endsWith(QStringLiteral("\r\n")))
+                {
+                    text.chop(2);
+                }
+                else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r')))
+                {
+                    text.chop(1);
+                }
+
+                impl->sendText(text);
+                QTimer::singleShot(100, this, [this]() {
+                    if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
+                    {
+                        if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
+                        {
+                            if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
+                            {
+                                QKeyEvent enterPress(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier, QString());
+                                QKeyEvent enterRelease(QEvent::KeyRelease, Qt::Key_Return, Qt::NoModifier, QString());
+                                delayedImpl->sendKeyEvent(&enterPress);
+                                delayedImpl->sendKeyEvent(&enterRelease);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    m_composeEdit->clear();
+    updateComposeHeight();
+    if (m_composeRawMode)
+    {
+        focusActiveTerminal();
+    }
+    else
+    {
+        m_composeEdit->setFocus(Qt::OtherFocusReason);
+    }
 }
 
 void MainWindow::enableDropMode()
