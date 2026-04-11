@@ -34,6 +34,7 @@ namespace LayerShellQt {
 
 class QToolButton;
 class QPlainTextEdit;
+class TermWidgetImpl;
 
 class MainWindow : public QMainWindow, private Ui::mainWindow, public DBusAddressable
 {
@@ -108,6 +109,10 @@ private:
     void setRawInputMode(bool rawMode);
     void sendComposeToTerminal();
     void focusActiveTerminal();
+    void clearTerminalInputBestEffort(TermWidgetImpl *impl);
+    void transferComposeToTerminal();
+    void transferTerminalSelectionToCompose();
+    QString normalizedTerminalSelection(const QString &text) const;
 
     bool hasMultipleTabs(QAction *);
     bool hasMultipleSubterminals(QAction *);

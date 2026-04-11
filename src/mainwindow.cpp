@@ -34,8 +34,10 @@
 #include <QTextOption>
 #include <QTextDocument>
 #include <QKeyEvent>
+#include <QRegularExpression>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 #ifdef HAVE_QDBUS
 #include <QtDBus/QtDBus>
@@ -224,6 +226,14 @@ void MainWindow::setupComposeInput()
     QShortcut *sendShortcutReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_composeEdit);
     connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
 
+    QShortcut *toComposeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);
+    toComposeShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(toComposeShortcut, &QShortcut::activated, this, &MainWindow::transferTerminalSelectionToCompose);
+
+    QShortcut *toTerminalShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Up), this);
+    toTerminalShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(toTerminalShortcut, &QShortcut::activated, this, &MainWindow::transferComposeToTerminal);
+
     m_toggleComposeAction = new QAction(this);
     m_toggleComposeAction->setShortcut(QKeySequence(QStringLiteral("F6")));
     m_toggleComposeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
@@ -295,6 +305,158 @@ void MainWindow::setRawInputMode(bool rawMode)
     }
 }
 
+QString MainWindow::normalizedTerminalSelection(const QString &text) const
+{
+    QString cleaned = text;
+    cleaned.remove(QLatin1Char('\r'));
+
+    static const QRegularExpression trailingWhitespace(QStringLiteral("[ \\t]+(?=\\n|$)"));
+    cleaned.replace(trailingWhitespace, QString());
+
+    while (cleaned.startsWith(QLatin1Char('\n')))
+    {
+        cleaned.remove(0, 1);
+    }
+    while (cleaned.endsWith(QLatin1Char('\n')))
+    {
+        cleaned.chop(1);
+    }
+
+    // QTermWidget may add soft-wrap indentation (commonly two spaces) to
+    // continuation lines in copied selections. Remove that artifact only when
+    // first line is unindented and all later non-empty lines share >=2 spaces.
+    QStringList lines = cleaned.split(QLatin1Char('\n'), Qt::KeepEmptyParts);
+    if (lines.size() > 1)
+    {
+        const QString &first = lines.at(0);
+        const bool firstIndented = first.startsWith(QLatin1Char(' ')) || first.startsWith(QLatin1Char('\t'));
+
+        int minContinuationIndent = std::numeric_limits<int>::max();
+        bool sawContinuation = false;
+        bool allContinuationHaveIndent = true;
+
+        for (int i = 1; i < lines.size(); ++i)
+        {
+            const QString &line = lines.at(i);
+            if (line.isEmpty())
+            {
+                continue;
+            }
+
+            sawContinuation = true;
+            int spaces = 0;
+            while (spaces < line.size() && line.at(spaces) == QLatin1Char(' '))
+            {
+                ++spaces;
+            }
+            if (spaces == 0)
+            {
+                allContinuationHaveIndent = false;
+                break;
+            }
+            minContinuationIndent = std::min(minContinuationIndent, spaces);
+        }
+
+        if (!firstIndented && sawContinuation && allContinuationHaveIndent && minContinuationIndent >= 2)
+        {
+            for (int i = 1; i < lines.size(); ++i)
+            {
+                QString &line = lines[i];
+                int toRemove = 0;
+                while (toRemove < 2 && toRemove < line.size() && line.at(toRemove) == QLatin1Char(' '))
+                {
+                    ++toRemove;
+                }
+                if (toRemove > 0)
+                {
+                    line.remove(0, toRemove);
+                }
+            }
+            cleaned = lines.join(QLatin1Char('\n'));
+        }
+    }
+
+    return cleaned;
+}
+
+void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
+{
+    if (impl == nullptr)
+    {
+        return;
+    }
+
+    // Best-effort generic clear for readline-like prompts:
+    // go to line end first, then clear line several times for multiline buffers.
+    impl->sendText(QString(QChar(0x05))); // Ctrl+E
+    for (int i = 0; i < 8; ++i)
+    {
+        impl->sendText(QString(QChar(0x15))); // Ctrl+U
+    }
+}
+
+void MainWindow::transferComposeToTerminal()
+{
+    if (m_composeEdit == nullptr)
+    {
+        return;
+    }
+
+    QString text = m_composeEdit->toPlainText();
+    if (text.isEmpty())
+    {
+        return;
+    }
+
+    if (text.endsWith(QStringLiteral("\r\n")))
+    {
+        text.chop(2);
+    }
+    else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r')))
+    {
+        text.chop(1);
+    }
+
+    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
+    {
+        if (TermWidget *term = holder->currentTerminal())
+        {
+            if (TermWidgetImpl *impl = term->impl())
+            {
+                clearTerminalInputBestEffort(impl);
+                impl->sendText(text);
+                focusActiveTerminal();
+            }
+        }
+    }
+}
+
+void MainWindow::transferTerminalSelectionToCompose()
+{
+    if (m_composeEdit == nullptr)
+    {
+        return;
+    }
+
+    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
+    {
+        if (TermWidget *term = holder->currentTerminal())
+        {
+            if (TermWidgetImpl *impl = term->impl())
+            {
+                const QString normalized = normalizedTerminalSelection(impl->selectedText(true));
+                if (normalized.isEmpty())
+                {
+                    return;
+                }
+                m_composeEdit->setPlainText(normalized);
+                updateComposeHeight();
+                setRawInputMode(false);
+            }
+        }
+    }
+}
+
 void MainWindow::sendComposeToTerminal()
 {
     if (m_composeEdit == nullptr)
@@ -314,6 +476,7 @@ void MainWindow::sendComposeToTerminal()
         {
             if (TermWidgetImpl *impl = term->impl())
             {
+                clearTerminalInputBestEffort(impl);
                 // Ctrl+Enter can insert a trailing newline in the compose editor before submit.
                 // Keep multiline content, but drop one accidental trailing line break.
                 if (text.endsWith(QStringLiteral("\r\n")))
