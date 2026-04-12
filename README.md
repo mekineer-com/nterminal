@@ -1,3 +1,18 @@
+# NTerminal
+
+NTerminal adds a seamless text editor to QTerminal.
+
+When you are finished editing and want to send your input: `Ctrl+Enter`.
+
+## Shortcuts
+
+- `Ctrl+Enter`: send/execute editor contents in terminal.
+- `Ctrl+Shift+Up`: move editor contents to terminal input field.
+- `Ctrl+Shift+Down`: move terminal input field contents to editor (do highlight the text first, for God's sake!).
+- `F6`: hide/show the text editor.
+
+---
+
 # QTerminal
 
 ## Overview
@@ -34,4 +49,3 @@ Translations can be done in [LXQt-Weblate](https://translate.lxqt-project.org/pr
 <a href="https://translate.lxqt-project.org/projects/lxqt-desktop/qterminal/">
 <img src="https://translate.lxqt-project.org/widgets/lxqt-desktop/-/qterminal/multi-auto.svg" alt="Translation status" />
 </a>
-
