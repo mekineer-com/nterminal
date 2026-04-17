@@ -1,8 +1,11 @@
 # NTerminal
 
-NTerminal adds a seamless text editor to QTerminal.
+NTerminal adds a seamless text editor to QTerminal. Focus is on compatibility with Claude Code, Codex CLI, and Gemini CLI.
 
 When you are finished editing and want to send your input: `Ctrl+Enter`.
+
+Startup behavior: NTerminal opens with the compose editor visible, but keyboard focus starts on the terminal input field.
+Compose editor auto-grows up to 12 lines by default (`NTERMINAL_COMPOSE_MAX_LINES` can override).
 
 ## Shortcuts
 
