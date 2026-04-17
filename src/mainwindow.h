@@ -113,7 +113,6 @@ private:
     void transferComposeToTerminal();
     void transferTerminalSelectionToCompose();
     QString normalizedTerminalSelection(const QString &text) const;
-    void dumpComposeDebugState();
 
     bool hasMultipleTabs(QAction *);
     bool hasMultipleSubterminals(QAction *);

@@ -36,9 +36,6 @@
 #include <QKeyEvent>
 #include <QRegularExpression>
 #include <QFile>
-#include <QDateTime>
-#include <QTextStream>
-#include <QStyle>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -164,15 +161,6 @@ void sendKey(TermWidgetImpl *impl, int key)
     impl->sendKeyEvent(&keyRelease);
 }
 
-QString colorToString(const QColor &c)
-{
-    return QStringLiteral("%1,%2,%3,%4")
-        .arg(c.red())
-        .arg(c.green())
-        .arg(c.blue())
-        .arg(c.alpha());
-}
-
 } // namespace
 
 MainWindow::MainWindow(TerminalConfig &cfg,
@@ -282,6 +270,7 @@ MainWindow::MainWindow(TerminalConfig &cfg,
     if (m_nterminalCompose)
     {
         setRawInputMode(false);
+        focusActiveTerminal();
     }
 }
 
@@ -328,6 +317,7 @@ void MainWindow::setupComposeInput()
     m_composeEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_composeEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_composeEdit->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
+    m_composeEdit->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
     layout->addWidget(m_composeEdit, 1, 0);
     layout->setRowStretch(0, 1);
@@ -347,10 +337,6 @@ void MainWindow::setupComposeInput()
     toTerminalShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(toTerminalShortcut, &QShortcut::activated, this, &MainWindow::transferComposeToTerminal);
 
-    QShortcut *debugShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F8), this);
-    debugShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(debugShortcut, &QShortcut::activated, this, &MainWindow::dumpComposeDebugState);
-
     m_toggleComposeAction = new QAction(this);
     m_toggleComposeAction->setShortcut(QKeySequence(QStringLiteral("F6")));
     m_toggleComposeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
@@ -361,8 +347,6 @@ void MainWindow::setupComposeInput()
 
     updateComposeHeight();
     setRawInputMode(false);
-    // Keep compose visible on startup, but start typing in the terminal prompt.
-    focusActiveTerminal();
 }
 
 void MainWindow::updateComposeHeight()
@@ -621,100 +605,6 @@ void MainWindow::transferTerminalSelectionToCompose()
             }
         }
     }
-}
-
-void MainWindow::dumpComposeDebugState()
-{
-    const QString path = QStringLiteral("/tmp/nterminal-compose-debug.log");
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
-    {
-        qWarning() << "nterminal debug: failed to open" << path;
-        return;
-    }
-
-    QTextStream out(&f);
-    out << "=== compose-debug " << QDateTime::currentDateTime().toString(Qt::ISODateWithMs) << " ===\n";
-    out << "window_title=" << windowTitle() << "\n";
-    out << "compose_enabled=" << (m_nterminalCompose ? "1" : "0") << "\n";
-    out << "compose_raw_mode=" << (m_composeRawMode ? "1" : "0") << "\n";
-    out << "focus_on_mouse_over=" << (Properties::Instance()->focusOnMoueOver ? "1" : "0") << "\n";
-    QWidget *focusW = QApplication::focusWidget();
-    out << "focus_widget_object=" << (focusW ? focusW->objectName() : QStringLiteral("<null>")) << "\n";
-    out << "focus_widget_class=" << (focusW ? QString::fromLatin1(focusW->metaObject()->className()) : QStringLiteral("<null>")) << "\n";
-
-    if (m_composeEdit == nullptr)
-    {
-        out << "compose_widget=null\n\n";
-        f.close();
-        qWarning() << "nterminal debug snapshot written to" << path;
-        return;
-    }
-
-    const QPalette pal = m_composeEdit->palette();
-    const QString plain = m_composeEdit->toPlainText();
-    const QString sel = m_composeEdit->textCursor().selectedText();
-    int controlChars = 0;
-    int escChars = 0;
-    for (const QChar ch : plain)
-    {
-        const ushort u = ch.unicode();
-        if (u == 0x1B)
-        {
-            ++escChars;
-        }
-        if ((u <= 0x1F && u != '\n' && u != '\t') || u == 0x7F)
-        {
-            ++controlChars;
-        }
-    }
-
-    const QTextCursor cur = m_composeEdit->textCursor();
-    out << "compose_visible=" << (m_composeEdit->isVisible() ? "1" : "0") << "\n";
-    out << "compose_focus=" << (m_composeEdit->hasFocus() ? "1" : "0") << "\n";
-    out << "compose_read_only=" << (m_composeEdit->isReadOnly() ? "1" : "0") << "\n";
-    out << "cursor_pos=" << cur.position() << "\n";
-    out << "cursor_anchor=" << cur.anchor() << "\n";
-    out << "selected_len=" << sel.size() << "\n";
-    out << "plain_len=" << plain.size() << "\n";
-    out << "plain_control_chars=" << controlChars << "\n";
-    out << "plain_esc_chars=" << escChars << "\n";
-    out << "palette_base=" << colorToString(pal.color(QPalette::Base)) << "\n";
-    out << "palette_text=" << colorToString(pal.color(QPalette::Text)) << "\n";
-    out << "palette_highlight=" << colorToString(pal.color(QPalette::Highlight)) << "\n";
-    out << "palette_highlighted_text=" << colorToString(pal.color(QPalette::HighlightedText)) << "\n";
-    out << "stylesheet_len=" << m_composeEdit->styleSheet().size() << "\n";
-    out << "app_style=" << QApplication::style()->objectName() << "\n";
-
-    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
-    {
-        if (TermWidget *term = holder->currentTerminal())
-        {
-            if (TermWidgetImpl *impl = term->impl())
-            {
-                const ComposeCli cli = detectComposeCli(impl);
-                QString cliName = QStringLiteral("unknown");
-                if (cli == ComposeCli::Claude)
-                {
-                    cliName = QStringLiteral("claude");
-                }
-                else if (cli == ComposeCli::Codex)
-                {
-                    cliName = QStringLiteral("codex");
-                }
-                else if (cli == ComposeCli::Gemini)
-                {
-                    cliName = QStringLiteral("gemini");
-                }
-                out << "detected_cli=" << cliName << "\n";
-                out << "terminal_selected_len=" << impl->selectedText(true).size() << "\n";
-            }
-        }
-    }
-
-    out << "\n";
-    f.close();
-    qWarning() << "nterminal debug snapshot written to" << path;
 }
 
 void MainWindow::sendComposeToTerminal()
