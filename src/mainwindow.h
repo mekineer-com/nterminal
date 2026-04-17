@@ -63,6 +63,7 @@ public:
 protected:
      bool event(QEvent* event) override;
      void showEvent(QShowEvent* event) override;
+     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     QActionGroup *tabPosition, *scrollBarPosition, *keyboardCursorShape;

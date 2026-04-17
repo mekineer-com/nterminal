@@ -34,6 +34,7 @@
 #include <QTextOption>
 #include <QTextDocument>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QRegularExpression>
 #include <QFile>
 #include <cmath>
@@ -323,6 +324,8 @@ void MainWindow::setupComposeInput()
     layout->setRowStretch(0, 1);
     layout->setRowStretch(1, 0);
 
+    m_composeEdit->viewport()->installEventFilter(this);
+
     connect(m_composeEdit->document(), &QTextDocument::contentsChanged,
             this, &MainWindow::updateComposeHeight);
 
@@ -371,6 +374,21 @@ void MainWindow::updateComposeHeight()
     const int padding = 8;
     const int frame = m_composeEdit->frameWidth() * 2;
     m_composeEdit->setFixedHeight(frame + padding + (visualLines * fm.lineSpacing()));
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (m_composeEdit != nullptr && watched == m_composeEdit->viewport()
+        && event->type() == QEvent::MouseMove)
+    {
+        auto *me = static_cast<QMouseEvent*>(event);
+        const QRect r = m_composeEdit->viewport()->rect();
+        if (!r.contains(me->position().toPoint()))
+        {
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::focusActiveTerminal()
