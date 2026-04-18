@@ -717,7 +717,7 @@ void MainWindow::sendComposeToTerminal()
                     // After the help menu fires, Gemini accepts all subsequent text including '?'
                     // as literal characters. So: send '?' to dismiss command mode, then the text.
                     impl->sendText(QStringLiteral("?"));
-                    QTimer::singleShot(300, this, [this, text]() {
+                    QTimer::singleShot(1000, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
