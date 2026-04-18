@@ -603,6 +603,20 @@ void MainWindow::transferComposeToTerminal()
                         }
                     });
                 }
+                else if (detectComposeCli(impl) == ComposeCli::Gemini)
+                {
+                    // Gemini needs the same clear-settle delay as Claude, otherwise
+                    // text arrives before Ctrl+U is processed and '?' hits an empty buffer.
+                    QTimer::singleShot(100, this, [this, text]() {
+                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
+                        if (TermWidget *t = h->currentTerminal())
+                        if (TermWidgetImpl *i = t->impl())
+                        {
+                            i->sendText(text);
+                            focusActiveTerminal();
+                        }
+                    });
+                }
                 else
                 {
                     impl->sendText(text);
@@ -716,7 +730,7 @@ void MainWindow::sendComposeToTerminal()
                     // Send text directly after clear settles. '?' arriving mid-text is fine
                     // because preceding chars already put Gemini in editing mode.
                     // Edge case (text starting with '?') is not handled.
-                    impl->sendText(QStringLiteral("GEMINI_BRANCH_CONFIRMED"));
+                    impl->sendText(QStringLiteral("?"));
                     QTimer::singleShot(3000, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
@@ -752,7 +766,7 @@ void MainWindow::sendComposeToTerminal()
                 else
                 {
                     // Unknown CLI fallback submit flow.
-                    impl->sendText(QStringLiteral("UNKNOWN_BRANCH:") + text);
+                    impl->sendText(text);
                     QTimer::singleShot(100, this, [this]() {
                         if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
                         {
