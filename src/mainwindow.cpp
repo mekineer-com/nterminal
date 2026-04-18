@@ -515,15 +515,7 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
 
     if (cli == ComposeCli::Claude)
     {
-        // Ctrl+A/K/U are not processed by Claude Code's TUI raw-mode input handler.
-        // Only backspace and arrow keys are confirmed working.
-        // Strategy: backspace from current position, then right-arrow to end of
-        // any remaining text, then backspace again.
-        constexpr int kN = 500;
-        const QString bs(kN, QChar(0x7F));
-        impl->sendText(bs);
-        impl->sendText(QStringLiteral("\x1b[C").repeated(kN));
-        impl->sendText(bs);
+        impl->sendText(QStringLiteral("\x15")); // Ctrl+U clears full input
         return;
     }
 
