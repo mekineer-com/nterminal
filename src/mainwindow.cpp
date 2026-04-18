@@ -333,11 +333,9 @@ void MainWindow::setupComposeInput()
     connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
 
     QShortcut *toComposeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);
-    toComposeShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(toComposeShortcut, &QShortcut::activated, this, &MainWindow::transferTerminalSelectionToCompose);
 
     QShortcut *toTerminalShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Up), this);
-    toTerminalShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(toTerminalShortcut, &QShortcut::activated, this, &MainWindow::transferComposeToTerminal);
 
     m_toggleComposeAction = new QAction(this);
@@ -382,10 +380,16 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         && event->type() == QEvent::MouseMove)
     {
         auto *me = static_cast<QMouseEvent*>(event);
-        const QRect r = m_composeEdit->viewport()->rect();
-        if (!r.contains(me->position().toPoint()))
+        // Only swallow MouseMove during active left-button drag in the compose
+        // editor. Without this guard, the filter fires on plain hover motion and
+        // has been observed to cause knock-on effects outside compose.
+        if (m_composeEdit->isVisible() && (me->buttons() & Qt::LeftButton))
         {
-            return true;
+            const QRect r = m_composeEdit->viewport()->rect();
+            if (!r.contains(me->position().toPoint()))
+            {
+                return true;
+            }
         }
     }
     return QMainWindow::eventFilter(watched, event);
