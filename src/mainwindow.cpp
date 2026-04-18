@@ -721,12 +721,20 @@ void MainWindow::sendComposeToTerminal()
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
                         {
-                            i->sendText(QStringLiteral("?") + text);
-                            QTimer::singleShot(300, this, [this]() {
+                            i->sendText(QStringLiteral("?"));
+                            QTimer::singleShot(100, this, [this, text]() {
                                 if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
                                 if (TermWidget *t2 = h2->currentTerminal())
                                 if (TermWidgetImpl *i2 = t2->impl())
-                                    i2->sendText(QString(QLatin1Char('\r')));
+                                {
+                                    i2->sendText(text);
+                                    QTimer::singleShot(200, this, [this]() {
+                                        if (TermWidgetHolder *h3 = consoleTabulator->terminalHolder())
+                                        if (TermWidget *t3 = h3->currentTerminal())
+                                        if (TermWidgetImpl *i3 = t3->impl())
+                                            i3->sendText(QString(QLatin1Char('\r')));
+                                    });
+                                }
                             });
                         }
                     });
