@@ -724,7 +724,8 @@ void MainWindow::sendComposeToTerminal()
                             {
                                 if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
                                 {
-                                    delayedImpl->sendText(text);
+                                    // Bracketed paste so Gemini treats '?' as literal text.
+                                    delayedImpl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
                                     QTimer::singleShot(300, this, [this]() {
                                         if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
                                         {
