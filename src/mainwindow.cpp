@@ -515,19 +515,17 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
 
     if (cli == ComposeCli::Claude)
     {
-        // Claude path: explicit repeated clear sequence.
-        // Sequence per pass: Ctrl+A, Ctrl+K, Backspace, Ctrl+U.
+        // sendCtrlKey passes empty text to sendKeyEvent; QTermWidget reads
+        // event->text() to decide what bytes to write to the pty, so empty
+        // text does nothing. Use sendText with the actual control bytes instead.
+        // Per pass: Ctrl+A (go to start), Ctrl+K (kill to end), Ctrl+U (kill to start).
         constexpr int kClaudePasses = 8;
         for (int i = 0; i < kClaudePasses; ++i)
         {
-            sendCtrlKey(impl, Qt::Key_A);
-            sendCtrlKey(impl, Qt::Key_K);
-            sendKey(impl, Qt::Key_Backspace);
-            sendCtrlKey(impl, Qt::Key_U);
+            impl->sendText(QStringLiteral("\x01")); // Ctrl+A
+            impl->sendText(QStringLiteral("\x0B")); // Ctrl+K
+            impl->sendText(QStringLiteral("\x15")); // Ctrl+U
         }
-        // Final kill-to-start to neutralize any leftover block at cursor.
-        sendCtrlKey(impl, Qt::Key_E);
-        sendCtrlKey(impl, Qt::Key_U);
         return;
     }
 
