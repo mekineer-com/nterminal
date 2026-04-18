@@ -102,8 +102,22 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 - Scrollbar works correctly in plain shell sessions.
 - No fix possible in nterminal without reverting `tui: fullscreen` in `~/.claude/settings.json`.
 
+## Critical Implementation Notes (for AI agents)
+
+**Build:** `cmake --build /home/marcos/gemini-cli/nterminal/build -j2`. Always confirm clean compile before committing.
+
+**`sendCtrlKey` sends nothing to pty.** Passes empty text to `QKeyEvent`; QTermWidget reads `event->text()` to decide what bytes to write. Fix: use `impl->sendText("\xNN")` with actual control bytes. Codex/Gemini clear paths also use `sendCtrlKey` and are reported working — the empty-text issue may be masked by those CLIs using readline at the tty level.
+
+**Ctrl+U and Ctrl+K ARE supported by Claude Code's input handler** (user-confirmed via manual keypress). The historical "hard block" was not from Ctrl+U/K being broken — it was caused by injecting raw `\n` characters which created line boundaries in Claude Code's multi-line input widget. Ctrl+U can only kill to start of the *current* line, not across `\n`-created boundaries. Fixed by bracketed paste on inject.
+
+**Claude clear path** (`clearTerminalInputBestEffort`): uses brute-force backspace × 500 + right-arrow × 500 + backspace × 500. This handles multi-line existing input regardless of cursor position. Ctrl+U/K would work for single-line but not multi-line.
+
+**Claude Code `tui: fullscreen`** (set in `~/.claude/settings.json`): ink/React with mouse reporting. Plain drag goes to the app — `copyAvailable` never fires. **Shift+drag** forces terminal-level selection and sets X11 PRIMARY.
+
+**Claude inject path** (`transferComposeToTerminal`): 100 ms delay after clear + bracketed paste wrap (`\x1b[200~`...`\x1b[201~`) so Claude Code treats `\n` as literal newline, not a line-boundary that blocks backspace.
+
 ## Outlier Note
 - Current outliers:
-  - Claude clear/replace: hard block at cursor position after multi-line inject — Ctrl+E+Ctrl+U at end of clear sequence added in this build, needs re-test. Root cause may be in how Claude Code renders injected multi-line text rather than in clear residue.
+  - Claude clear/replace: **working** as of 2026-04-18 (brute-force backspace+arrows + bracketed paste inject). Re-test with multi-line compose content recommended.
   - Gemini clear and `?` preservation remain RT; submit is working with 300ms raw `\r`.
   - Ctrl+Shift+Down in Claude Code: requires Shift+drag (not plain drag) due to app mouse reporting. See section above.
