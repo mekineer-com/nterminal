@@ -713,17 +713,23 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else if (submitCli == ComposeCli::Gemini)
                 {
-                    // '?' triggers Gemini's help menu when buffer is empty, consuming the '?'.
-                    // After the help menu fires, Gemini accepts all subsequent text including '?'
-                    // as literal characters. So: send '?' to dismiss command mode, then the text.
-                    impl->sendText(QStringLiteral("?"));
-                    QTimer::singleShot(1000, this, [this, text]() {
+                    // After clear the buffer is empty; Gemini swallows '?' in empty-buffer
+                    // (command) mode. Node.js buffers stdin so delays between '?' and text
+                    // don't help — it reads them together regardless.
+                    //
+                    // Reliable approach using only confirmed-working operations:
+                    //   space → text → left×text.length() → backspace
+                    // The space puts Gemini in editing mode so '?' is literal.
+                    // Navigating back exactly text.length() puts cursor between space and text.
+                    // Backspace removes the space. Buffer = text, clean.
+                    QTimer::singleShot(100, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
                         {
-                            i->sendText(text);
-                            QTimer::singleShot(100, this, [this]() {
+                            const QString leftN = QStringLiteral("\x1b[D").repeated(text.length());
+                            i->sendText(QStringLiteral(" ") + text + leftN + QStringLiteral("\x7f"));
+                            QTimer::singleShot(200, this, [this]() {
                                 if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
                                 if (TermWidget *t2 = h2->currentTerminal())
                                 if (TermWidgetImpl *i2 = t2->impl())
