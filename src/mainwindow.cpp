@@ -525,6 +525,9 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
             sendKey(impl, Qt::Key_Backspace);
             sendCtrlKey(impl, Qt::Key_U);
         }
+        // Final kill-to-start to neutralize any leftover block at cursor.
+        sendCtrlKey(impl, Qt::Key_E);
+        sendCtrlKey(impl, Qt::Key_U);
         return;
     }
 
@@ -596,7 +599,13 @@ void MainWindow::transferComposeToTerminal()
             if (TermWidgetImpl *impl = term->impl())
             {
                 clearTerminalInputBestEffort(impl);
-                impl->sendText(text);
+                // Claude Code's multi-line input creates unbackspaceable line
+                // boundaries when \n is sent raw. Bracketed paste mode tells
+                // it to treat newlines as literal newlines, not line separators.
+                if (detectComposeCli(impl) == ComposeCli::Claude)
+                    impl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                else
+                    impl->sendText(text);
                 focusActiveTerminal();
             }
         }

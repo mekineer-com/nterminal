@@ -15,7 +15,7 @@ Last updated: 2026-04-18
 
 | CLI Version | Replace Prompt From Editor | Preserve `?` In Text | `Ctrl+Enter` Submits Message | Notes |
 |---|---|---|---|---|
-| Claude Code `2.1.91` | F | W | F | User-confirmed: Claude-specific clear path still does not clear prefix lines in real session. Decision note: next build should remove Claude-specific clear path and return Claude to shared fallback clear. Submit path still uses Claude-specific raw `\r`. |
+| Claude Code `2.1.112` | RT | W | W | Submit works (raw `\r`). Clear leaves a hard block at one cursor position after multi-line inject; this build adds Ctrl+E + Ctrl+U at end of clear sequence to neutralize it — needs re-test. |
 | Codex CLI `0.118.0` | W | W | W | Uses shared fallback clear path (`Ctrl+K` x8, `Ctrl+U` x8). Historical note: raw `\r` submit was bad for Codex; Enter-key submit is the known-good path. |
 | Gemini CLI `0.35.2` | RT | RT | W | Gemini-specific hard pin: clear uses `Down x8` then `Ctrl+E`, then (`Ctrl+U` + Backspace) x8; submit uses raw `\r` after 300ms (100ms Enter-event attempt failed: newline). User-confirmed submit working. |
 
@@ -90,10 +90,12 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 
 ## Bidirectional Transfer (Ctrl+Shift+Down / Ctrl+Shift+Up)
 
-### Ctrl+Shift+Down (terminal → compose) — fixed 2026-04-18
-- Was silently failing in Claude Code because `tui: fullscreen` alt-screen TUI fires frequent `copyAvailable(false)` repaints that wipe Konsole's internal selection before the shortcut handler runs.
-- Fix: `TermWidget` caches the selection text at `copyAvailable(true)` (mouseUp time). `transferTerminalSelectionToCompose` uses the live `selectedText()` first; falls back to the cache when empty. No clipboard used.
-- Fix is in commits `ea9cae0` + `f1ee852`; tested on Xvfb `:99` with Claude Code fullscreen TUI.
+### Ctrl+Shift+Down (terminal → compose)
+- In Claude Code's fullscreen TUI, ink/React enables X11 mouse reporting. Mouse drag events go to the app, not to QTermWidget's selection engine. `copyAvailable` never fires for plain drag; cache stays empty.
+- **Workaround required in Claude Code: use Shift+drag instead of plain drag.** Shift+drag forces the terminal emulator to create a terminal-level selection, bypassing app mouse reporting.
+- This build adds a second cache path: `TermWidget` now also listens to `QClipboard::selectionChanged` (X11 PRIMARY). Shift+drag sets PRIMARY → `selectionChanged` fires → cache updated → Ctrl+Shift+Down finds it.
+- No clipboard manager pollution: we only read PRIMARY (which the drag already set), never write to CLIPBOARD.
+- Plain shell / Codex / Gemini: plain drag works (no app mouse reporting); `copyAvailable` path handles it.
 
 ### Scrollbar in Claude Code — not an nterminal bug
 - `tui: fullscreen` (active since 2026-04-17) puts Claude in alt-screen mode. Alt-screen has no scrollback buffer; QTermWidget shows no scrollbar thumb because there is nothing to scroll.
@@ -102,7 +104,6 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 
 ## Outlier Note
 - Current outliers:
-  - Claude replace/clear still fails in real user session. Next build decision: revert Claude clear to shared fallback clear (remove Claude-specific clear path).
-  - Claude submit still failing in latest user report despite Claude-specific raw `\r` path.
+  - Claude clear/replace: hard block at cursor position after multi-line inject — Ctrl+E+Ctrl+U at end of clear sequence added in this build, needs re-test. Root cause may be in how Claude Code renders injected multi-line text rather than in clear residue.
   - Gemini clear and `?` preservation remain RT; submit is working with 300ms raw `\r`.
-  - Ctrl+Shift+Down: **fixed** for Claude Code alt-screen TUI (see above). Re-test needed for other CLIs.
+  - Ctrl+Shift+Down in Claude Code: requires Shift+drag (not plain drag) due to app mouse reporting. See section above.

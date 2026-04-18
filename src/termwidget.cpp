@@ -18,6 +18,8 @@
 
 #include <QMenu>
 #include <QVBoxLayout>
+#include <QGuiApplication>
+#include <QClipboard>
 #include <QPainter>
 #include <QDesktopServices>
 #include <QMessageBox>
@@ -327,6 +329,14 @@ TermWidget::TermWidget(TerminalConfig &cfg, QWidget *parent)
         {
             m_lastSelectedText = m_term->selectedText(true);
         }
+    });
+    // Also cache via X11 PRIMARY selection. In Claude Code's fullscreen TUI,
+    // mouse events go to the app so copyAvailable never fires for normal drag.
+    // Shift+drag bypasses app mouse reporting and sets PRIMARY directly.
+    connect(QGuiApplication::clipboard(), &QClipboard::selectionChanged, this, [this]() {
+        const QString sel = QGuiApplication::clipboard()->text(QClipboard::Selection);
+        if (!sel.isEmpty())
+            m_lastSelectedText = sel;
     });
 }
 
