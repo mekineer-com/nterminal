@@ -534,6 +534,10 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
             impl->sendText(QString(QChar(0x15))); // Ctrl+U
             sendKey(impl, Qt::Key_Backspace);
         }
+        // Plant a space so Gemini stays in editing mode (not command mode).
+        // The send path will remove it with a leading backspace before injecting text.
+        // Without this, an empty buffer puts Gemini in command mode where '??' -> swallowed.
+        impl->sendText(QStringLiteral(" "));
         return;
     }
 
@@ -724,10 +728,12 @@ void MainWindow::sendComposeToTerminal()
                             {
                                 if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
                                 {
-                                    // Gemini treats '?' as an escape prefix; '??' → literal '?'.
+                                    // Leading backspace removes the placeholder space planted
+                                    // by the clear path to keep Gemini in editing mode.
+                                    // Then '??' -> literal '?' (Gemini uses '?' as escape prefix).
                                     QString geminiText = text;
                                     geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
-                                    delayedImpl->sendText(geminiText);
+                                    delayedImpl->sendText(QStringLiteral("\x7f") + geminiText);
                                     QTimer::singleShot(300, this, [this]() {
                                         if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
                                         {
