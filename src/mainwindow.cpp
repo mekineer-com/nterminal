@@ -534,7 +534,6 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
             impl->sendText(QString(QChar(0x15))); // Ctrl+U
             sendKey(impl, Qt::Key_Backspace);
         }
-        // Space is sent after a delay in the submit path — not here.
         return;
     }
 
@@ -714,34 +713,20 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else if (submitCli == ComposeCli::Gemini)
                 {
-                    // Gemini uses '?' as a command trigger when buffer is empty (command mode).
-                    // The clear path plants a space to keep Gemini in editing mode.
-                    // After 100ms: send text (buffer = " " + text, '??' -> '?' works in editing mode),
-                    // then Ctrl+A to go to start, then Ctrl+D to delete the leading space forward.
-                    QString geminiText = text;
-                    geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
-                    // Step 1 (100ms): clear has settled — plant the space.
-                    QTimer::singleShot(100, this, [this, geminiText]() {
+                    // '?' triggers Gemini's help menu when buffer is empty, consuming the '?'.
+                    // After the help menu fires, Gemini accepts all subsequent text including '?'
+                    // as literal characters. So: send '?' to dismiss command mode, then the text.
+                    QTimer::singleShot(100, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
                         {
-                            i->sendText(QStringLiteral(" "));
-                            // Step 2 (100ms): space processed — send text, then Ctrl+A + Ctrl+D.
-                            QTimer::singleShot(100, this, [this, geminiText]() {
+                            i->sendText(QStringLiteral("?") + text);
+                            QTimer::singleShot(300, this, [this]() {
                                 if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
                                 if (TermWidget *t2 = h2->currentTerminal())
                                 if (TermWidgetImpl *i2 = t2->impl())
-                                {
-                                    i2->sendText(geminiText + QStringLiteral("\x01\x04"));
-                                    // Step 3 (300ms): submit.
-                                    QTimer::singleShot(300, this, [this]() {
-                                        if (TermWidgetHolder *h3 = consoleTabulator->terminalHolder())
-                                        if (TermWidget *t3 = h3->currentTerminal())
-                                        if (TermWidgetImpl *i3 = t3->impl())
-                                            i3->sendText(QString(QLatin1Char('\r')));
-                                    });
-                                }
+                                    i2->sendText(QString(QLatin1Char('\r')));
                             });
                         }
                     });
