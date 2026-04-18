@@ -535,8 +535,7 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
             sendKey(impl, Qt::Key_Backspace);
         }
         // Plant a space so Gemini stays in editing mode (not command mode).
-        // The send path will remove it with a leading backspace before injecting text.
-        // Without this, an empty buffer puts Gemini in command mode where '??' -> swallowed.
+        // Send path: text + Ctrl+A + Ctrl+D removes it (go to start, delete forward).
         impl->sendText(QStringLiteral(" "));
         return;
     }
@@ -717,23 +716,20 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else if (submitCli == ComposeCli::Gemini)
                 {
-                    // Gemini path:
-                    // 1) wait after clear so pending clear keys do not eat tail chars (for example '?')
-                    // 2) then insert text
-                    // 3) wait before raw carriage return submit
-                    QTimer::singleShot(100, this, [this, text]() {
+                    // Gemini uses '?' as a command trigger when buffer is empty (command mode).
+                    // The clear path plants a space to keep Gemini in editing mode.
+                    // After 100ms: send text (buffer = " " + text, '??' -> '?' works in editing mode),
+                    // then Ctrl+A to go to start, then Ctrl+D to delete the leading space forward.
+                    QString geminiText = text;
+                    geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
+                    QTimer::singleShot(100, this, [this, geminiText]() {
                         if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
                         {
                             if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
                             {
                                 if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
                                 {
-                                    // Leading backspace removes the placeholder space planted
-                                    // by the clear path to keep Gemini in editing mode.
-                                    // Then '??' -> literal '?' (Gemini uses '?' as escape prefix).
-                                    QString geminiText = text;
-                                    geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
-                                    delayedImpl->sendText(QStringLiteral("\x7f") + geminiText);
+                                    delayedImpl->sendText(geminiText + QStringLiteral("\x01\x04"));
                                     QTimer::singleShot(300, this, [this]() {
                                         if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
                                         {
