@@ -331,6 +331,8 @@ void MainWindow::setupComposeInput()
 
     QShortcut *sendShortcutReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_composeEdit);
     connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
+    QShortcut *sendShortcutEnter = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Enter), m_composeEdit);
+    connect(sendShortcutEnter, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
 
     QShortcut *toComposeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);
     connect(toComposeShortcut, &QShortcut::activated, this, &MainWindow::transferTerminalSelectionToCompose);
