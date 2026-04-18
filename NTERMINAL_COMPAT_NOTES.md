@@ -15,9 +15,9 @@ Last updated: 2026-04-18
 
 | CLI Version | Replace Prompt From Editor | Preserve `?` In Text | `Ctrl+Enter` Submits Message | Notes |
 |---|---|---|---|---|
-| Claude Code `2.1.112` | RT | W | W | Submit works (raw `\r`). Clear leaves a hard block at one cursor position after multi-line inject; this build adds Ctrl+E + Ctrl+U at end of clear sequence to neutralize it — needs re-test. |
-| Codex CLI `0.118.0` | W | W | W | Uses shared fallback clear path (`Ctrl+K` x8, `Ctrl+U` x8). Historical note: raw `\r` submit was bad for Codex; Enter-key submit is the known-good path. |
-| Gemini CLI `0.35.2` | RT | RT | W | Gemini-specific hard pin: clear uses `Down x8` then `Ctrl+E`, then (`Ctrl+U` + Backspace) x8; submit uses raw `\r` after 300ms (100ms Enter-event attempt failed: newline). User-confirmed submit working. |
+| Claude Code `2.1.112` | W | W | W | Clear: single Ctrl+U. Inject: 100ms delay + bracketed paste. Submit: raw `\r` after 100ms. |
+| Codex CLI `0.118.0` | W | W | W | Uses shared fallback clear path (`Ctrl+K` x8, `Ctrl+U` x8). Enter-key submit after 100ms. |
+| Gemini CLI `0.38.1` | RT | W | W | Clear: Ctrl+E + Ctrl+U x8. Both transfer and submit paths: send `?` immediately (triggers help menu, puts Gemini in editing mode), 100ms delay, then text. Submit: raw `\r` after 200ms. `?` in text preserved because Gemini treats `?` as literal in editing mode. |
 
 Marcos notes: claude and codex never had issues with the question mark: only gemini.
 
@@ -110,7 +110,9 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 
 **Ctrl+U and Ctrl+K ARE supported by Claude Code's input handler** (user-confirmed via manual keypress). The historical "hard block" was not from Ctrl+U/K being broken — it was caused by injecting raw `\n` characters which created line boundaries in Claude Code's multi-line input widget. Ctrl+U can only kill to start of the *current* line, not across `\n`-created boundaries. Fixed by bracketed paste on inject.
 
-**Claude clear path** (`clearTerminalInputBestEffort`): uses brute-force backspace × 500 + right-arrow × 500 + backspace × 500. This handles multi-line existing input regardless of cursor position. Ctrl+U/K would work for single-line but not multi-line.
+**Claude clear path** (`clearTerminalInputBestEffort`): single `\x15` (Ctrl+U) — confirmed full clear regardless of cursor position in Claude Code.
+
+**Gemini `?` handling:** Gemini treats `?` as a command trigger when input buffer is empty (shows help menu, consumes the `?`). Fix: send `?` immediately after clear to fire the help menu, 100ms delay, then send text. After help menu fires, Gemini is in editing mode and all `?` in text are literal. Applies to both `transferComposeToTerminal` and `sendComposeToTerminal`. Node.js buffers stdin so delays between `?` and text are unreliable — the 100ms is just enough for the help menu to render.
 
 **Claude Code `tui: fullscreen`** (set in `~/.claude/settings.json`): ink/React with mouse reporting. Plain drag goes to the app — `copyAvailable` never fires. **Shift+drag** forces terminal-level selection and sets X11 PRIMARY.
 
@@ -118,6 +120,6 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 
 ## Outlier Note
 - Current outliers:
-  - Claude clear/replace: **working** as of 2026-04-18 (brute-force backspace+arrows + bracketed paste inject). Re-test with multi-line compose content recommended.
-  - Gemini clear and `?` preservation remain RT; submit is working with 300ms raw `\r`.
+  - Claude clear/replace and `?`: **working**.
+  - Gemini `?` preservation: **working** (2026-04-18). Gemini clear: RT.
   - Ctrl+Shift+Down in Claude Code: requires Shift+drag (not plain drag) due to app mouse reporting. See section above.
