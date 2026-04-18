@@ -716,13 +716,14 @@ void MainWindow::sendComposeToTerminal()
                     // Send text directly after clear settles. '?' arriving mid-text is fine
                     // because preceding chars already put Gemini in editing mode.
                     // Edge case (text starting with '?') is not handled.
-                    QTimer::singleShot(100, this, [this, text]() {
+                    impl->sendText(QStringLiteral("?"));
+                    QTimer::singleShot(3000, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
                         {
                             i->sendText(text);
-                            QTimer::singleShot(200, this, [this]() {
+                            QTimer::singleShot(100, this, [this]() {
                                 if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
                                 if (TermWidget *t2 = h2->currentTerminal())
                                 if (TermWidgetImpl *i2 = t2->impl())
