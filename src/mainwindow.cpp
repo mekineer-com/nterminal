@@ -605,8 +605,7 @@ void MainWindow::transferComposeToTerminal()
                 }
                 else if (detectComposeCli(impl) == ComposeCli::Gemini)
                 {
-                    // Gemini needs the same clear-settle delay as Claude, otherwise
-                    // text arrives before Ctrl+U is processed and '?' hits an empty buffer.
+                    impl->sendText(QStringLiteral("?"));
                     QTimer::singleShot(100, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
@@ -727,8 +726,7 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else if (submitCli == ComposeCli::Gemini)
                 {
-                    // 100ms lets Ctrl+U clear settle before text arrives.
-                    // '?' mid-text is literal once preceding chars put Gemini in editing mode.
+                    impl->sendText(QStringLiteral("?"));
                     QTimer::singleShot(100, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
