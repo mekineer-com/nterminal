@@ -716,7 +716,7 @@ void MainWindow::sendComposeToTerminal()
                     // Send text directly after clear settles. '?' arriving mid-text is fine
                     // because preceding chars already put Gemini in editing mode.
                     // Edge case (text starting with '?') is not handled.
-                    impl->sendText(QStringLiteral("?"));
+                    impl->sendText(QStringLiteral("GEMINI_BRANCH_CONFIRMED"));
                     QTimer::singleShot(3000, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
@@ -752,7 +752,7 @@ void MainWindow::sendComposeToTerminal()
                 else
                 {
                     // Unknown CLI fallback submit flow.
-                    impl->sendText(text);
+                    impl->sendText(QStringLiteral("UNKNOWN_BRANCH:") + text);
                     QTimer::singleShot(100, this, [this]() {
                         if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
                         {
