@@ -519,7 +519,7 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
         // Only backspace and arrow keys are confirmed working.
         // Strategy: backspace from current position, then right-arrow to end of
         // any remaining text, then backspace again.
-        constexpr int kN = 2000;
+        constexpr int kN = 500;
         const QString bs(kN, QChar(0x7F));
         impl->sendText(bs);
         impl->sendText(QStringLiteral("\x1b[C").repeated(kN));
