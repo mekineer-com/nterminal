@@ -599,14 +599,27 @@ void MainWindow::transferComposeToTerminal()
             if (TermWidgetImpl *impl = term->impl())
             {
                 clearTerminalInputBestEffort(impl);
-                // Claude Code's multi-line input creates unbackspaceable line
-                // boundaries when \n is sent raw. Bracketed paste mode tells
-                // it to treat newlines as literal newlines, not line separators.
                 if (detectComposeCli(impl) == ComposeCli::Claude)
-                    impl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                {
+                    // Claude's async input handler needs time to process the
+                    // clear key events before new text arrives (same as submit path).
+                    // Also use bracketed paste so \n is treated as literal newline,
+                    // not a line-boundary that creates an unbackspaceable block.
+                    QTimer::singleShot(100, this, [this, text]() {
+                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
+                        if (TermWidget *t = h->currentTerminal())
+                        if (TermWidgetImpl *i = t->impl())
+                        {
+                            i->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                            focusActiveTerminal();
+                        }
+                    });
+                }
                 else
+                {
                     impl->sendText(text);
-                focusActiveTerminal();
+                    focusActiveTerminal();
+                }
             }
         }
     }
