@@ -724,8 +724,10 @@ void MainWindow::sendComposeToTerminal()
                             {
                                 if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
                                 {
-                                    // Bracketed paste so Gemini treats '?' as literal text.
-                                    delayedImpl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                                    // Gemini treats '?' as an escape prefix; '??' → literal '?'.
+                                    QString geminiText = text;
+                                    geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
+                                    delayedImpl->sendText(geminiText);
                                     QTimer::singleShot(300, this, [this]() {
                                         if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
                                         {
