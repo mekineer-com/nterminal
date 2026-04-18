@@ -713,22 +713,15 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else if (submitCli == ComposeCli::Gemini)
                 {
-                    // After clear the buffer is empty; Gemini swallows '?' in empty-buffer
-                    // (command) mode. Node.js buffers stdin so delays between '?' and text
-                    // don't help — it reads them together regardless.
-                    //
-                    // Reliable approach using only confirmed-working operations:
-                    //   space → text → left×text.length() → backspace
-                    // The space puts Gemini in editing mode so '?' is literal.
-                    // Navigating back exactly text.length() puts cursor between space and text.
-                    // Backspace removes the space. Buffer = text, clean.
+                    // Send text directly after clear settles. '?' arriving mid-text is fine
+                    // because preceding chars already put Gemini in editing mode.
+                    // Edge case (text starting with '?') is not handled.
                     QTimer::singleShot(100, this, [this, text]() {
                         if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
                         if (TermWidget *t = h->currentTerminal())
                         if (TermWidgetImpl *i = t->impl())
                         {
-                            const QString leftN = QStringLiteral("\x1b[D").repeated(text.length());
-                            i->sendText(QStringLiteral(" ") + text + leftN + QStringLiteral("\x7f"));
+                            i->sendText(text);
                             QTimer::singleShot(200, this, [this]() {
                                 if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
                                 if (TermWidget *t2 = h2->currentTerminal())
