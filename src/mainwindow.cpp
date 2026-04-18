@@ -515,17 +515,15 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
 
     if (cli == ComposeCli::Claude)
     {
-        // sendCtrlKey passes empty text to sendKeyEvent; QTermWidget reads
-        // event->text() to decide what bytes to write to the pty, so empty
-        // text does nothing. Use sendText with the actual control bytes instead.
-        // Per pass: Ctrl+A (go to start), Ctrl+K (kill to end), Ctrl+U (kill to start).
-        constexpr int kClaudePasses = 8;
-        for (int i = 0; i < kClaudePasses; ++i)
-        {
-            impl->sendText(QStringLiteral("\x01")); // Ctrl+A
-            impl->sendText(QStringLiteral("\x0B")); // Ctrl+K
-            impl->sendText(QStringLiteral("\x15")); // Ctrl+U
-        }
+        // Ctrl+A/K/U are not processed by Claude Code's TUI raw-mode input handler.
+        // Only backspace and arrow keys are confirmed working.
+        // Strategy: backspace from current position, then right-arrow to end of
+        // any remaining text, then backspace again.
+        constexpr int kN = 2000;
+        const QString bs(kN, QChar(0x7F));
+        impl->sendText(bs);
+        impl->sendText(QStringLiteral("\x1b[C").repeated(kN));
+        impl->sendText(bs);
         return;
     }
 
