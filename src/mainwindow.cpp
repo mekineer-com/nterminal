@@ -382,12 +382,6 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         && event->type() == QEvent::MouseMove)
     {
         auto *me = static_cast<QMouseEvent*>(event);
-        // Only block drag-selection auto-scroll when user is actively dragging
-        // selection in the compose editor.
-        if (!m_composeEdit->isVisible() || !(me->buttons() & Qt::LeftButton))
-        {
-            return QMainWindow::eventFilter(watched, event);
-        }
         const QRect r = m_composeEdit->viewport()->rect();
         if (!r.contains(me->position().toPoint()))
         {
