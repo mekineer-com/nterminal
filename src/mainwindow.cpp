@@ -616,7 +616,17 @@ void MainWindow::transferTerminalSelectionToCompose()
         {
             if (TermWidgetImpl *impl = term->impl())
             {
-                const QString normalized = normalizedTerminalSelection(impl->selectedText(true));
+                // In Claude Code's fullscreen/alt-screen mode, the app's frequent
+                // repaints invalidate Konsole's live selection, so selectedText()
+                // returns empty at shortcut time. TermWidget caches the text at
+                // copyAvailable(true); fall back to that.
+                QString source = impl->selectedText(true);
+                if (source.isEmpty())
+                {
+                    source = term->lastSelectedText();
+                }
+
+                const QString normalized = normalizedTerminalSelection(source);
                 if (normalized.isEmpty())
                 {
                     return;

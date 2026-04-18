@@ -322,6 +322,12 @@ TermWidget::TermWidget(TerminalConfig &cfg, QWidget *parent)
     connect(m_term, &QTermWidget::termGetFocus, this, &TermWidget::term_termGetFocus);
     connect(m_term, &QTermWidget::termLostFocus, this, &TermWidget::term_termLostFocus);
     connect(m_term, &QTermWidget::titleChanged, this, [this] { emit termTitleChanged(m_term->title(), m_term->icon()); });
+    connect(m_term, &QTermWidget::copyAvailable, this, [this](bool has) {
+        if (has)
+        {
+            m_lastSelectedText = m_term->selectedText(true);
+        }
+    });
 }
 
 void TermWidget::propertiesChanged()

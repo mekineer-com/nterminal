@@ -76,6 +76,7 @@ class TermWidget : public QWidget, public DBusAddressable
     TermWidgetImpl * m_term;
     QVBoxLayout * m_layout;
     QColor m_border;
+    QString m_lastSelectedText;
 
     public:
         TermWidget(TerminalConfig &cfg, QWidget * parent=nullptr);
@@ -84,6 +85,11 @@ class TermWidget : public QWidget, public DBusAddressable
         QStringList availableKeyBindings() { return m_term->availableKeyBindings(); }
 
         TermWidgetImpl * impl() { return m_term; }
+
+        // Last selected text captured at copyAvailable(true) time. Used as a
+        // fallback because fullscreen TUI apps (e.g. Claude Code) invalidate
+        // Konsole's live selection via frequent alt-screen repaints.
+        QString lastSelectedText() const { return m_lastSelectedText; }
 
         #ifdef HAVE_QDBUS
         QDBusObjectPath splitHorizontal(const QHash<QString,QVariant> &termArgs);
