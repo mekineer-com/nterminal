@@ -1,6 +1,6 @@
 # NTerminal Compatibility And Handoff Coverage
 
-Last updated: 2026-04-14
+Last updated: 2026-04-18
 
 ## Sources Covered
 - `/home/marcos/gemini-cli/HANDOFF.md`
@@ -88,8 +88,21 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
   - `/home/marcos/.local/bin/nterminal.orig`
   - `/home/marcos/.local/share/applications/nterminal.desktop.orig`
 
+## Bidirectional Transfer (Ctrl+Shift+Down / Ctrl+Shift+Up)
+
+### Ctrl+Shift+Down (terminal → compose) — fixed 2026-04-18
+- Was silently failing in Claude Code because `tui: fullscreen` alt-screen TUI fires frequent `copyAvailable(false)` repaints that wipe Konsole's internal selection before the shortcut handler runs.
+- Fix: `TermWidget` caches the selection text at `copyAvailable(true)` (mouseUp time). `transferTerminalSelectionToCompose` uses the live `selectedText()` first; falls back to the cache when empty. No clipboard used.
+- Fix is in commits `ea9cae0` + `f1ee852`; tested on Xvfb `:99` with Claude Code fullscreen TUI.
+
+### Scrollbar in Claude Code — not an nterminal bug
+- `tui: fullscreen` (active since 2026-04-17) puts Claude in alt-screen mode. Alt-screen has no scrollback buffer; QTermWidget shows no scrollbar thumb because there is nothing to scroll.
+- Scrollbar works correctly in plain shell sessions.
+- No fix possible in nterminal without reverting `tui: fullscreen` in `~/.claude/settings.json`.
+
 ## Outlier Note
 - Current outliers:
   - Claude replace/clear still fails in real user session. Next build decision: revert Claude clear to shared fallback clear (remove Claude-specific clear path).
   - Claude submit still failing in latest user report despite Claude-specific raw `\r` path.
   - Gemini clear and `?` preservation remain RT; submit is working with 300ms raw `\r`.
+  - Ctrl+Shift+Down: **fixed** for Claude Code alt-screen TUI (see above). Re-test needed for other CLIs.
