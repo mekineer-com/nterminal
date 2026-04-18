@@ -534,9 +534,7 @@ void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
             impl->sendText(QString(QChar(0x15))); // Ctrl+U
             sendKey(impl, Qt::Key_Backspace);
         }
-        // Plant a space so Gemini stays in editing mode (not command mode).
-        // Send path: text + Ctrl+A + Ctrl+D removes it (go to start, delete forward).
-        impl->sendText(QStringLiteral(" "));
+        // Space is sent after a delay in the submit path — not here.
         return;
     }
 
@@ -722,28 +720,29 @@ void MainWindow::sendComposeToTerminal()
                     // then Ctrl+A to go to start, then Ctrl+D to delete the leading space forward.
                     QString geminiText = text;
                     geminiText.replace(QLatin1Char('?'), QStringLiteral("??"));
+                    // Step 1 (100ms): clear has settled — plant the space.
                     QTimer::singleShot(100, this, [this, geminiText]() {
-                        if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
+                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
+                        if (TermWidget *t = h->currentTerminal())
+                        if (TermWidgetImpl *i = t->impl())
                         {
-                            if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
-                            {
-                                if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
+                            i->sendText(QStringLiteral(" "));
+                            // Step 2 (100ms): space processed — send text, then Ctrl+A + Ctrl+D.
+                            QTimer::singleShot(100, this, [this, geminiText]() {
+                                if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
+                                if (TermWidget *t2 = h2->currentTerminal())
+                                if (TermWidgetImpl *i2 = t2->impl())
                                 {
-                                    delayedImpl->sendText(geminiText + QStringLiteral("\x01\x04"));
+                                    i2->sendText(geminiText + QStringLiteral("\x01\x04"));
+                                    // Step 3 (300ms): submit.
                                     QTimer::singleShot(300, this, [this]() {
-                                        if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
-                                        {
-                                            if (TermWidget *submitTerm = submitHolder->currentTerminal())
-                                            {
-                                                if (TermWidgetImpl *submitImpl = submitTerm->impl())
-                                                {
-                                                    submitImpl->sendText(QString(QLatin1Char('\r')));
-                                                }
-                                            }
-                                        }
+                                        if (TermWidgetHolder *h3 = consoleTabulator->terminalHolder())
+                                        if (TermWidget *t3 = h3->currentTerminal())
+                                        if (TermWidgetImpl *i3 = t3->impl())
+                                            i3->sendText(QString(QLatin1Char('\r')));
                                     });
                                 }
-                            }
+                            });
                         }
                     });
                 }
