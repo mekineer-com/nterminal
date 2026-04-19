@@ -764,7 +764,9 @@ void MainWindow::sendComposeToTerminal()
                 }
                 else
                 {
-                    // Unknown CLI fallback submit flow.
+                    // Unknown CLI (bash, zsh, etc.) submit flow.
+                    // Use sendText("\r") — exactly one byte — not sendKey(Return) which
+                    // sends both KeyPress and KeyRelease and causes an extra Enter in readline.
                     impl->sendText(text);
                     QTimer::singleShot(100, this, [this]() {
                         if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
@@ -773,7 +775,7 @@ void MainWindow::sendComposeToTerminal()
                             {
                                 if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
                                 {
-                                    sendKey(delayedImpl, Qt::Key_Return);
+                                    delayedImpl->sendText(QString(QLatin1Char('\r')));
                                 }
                             }
                         }
