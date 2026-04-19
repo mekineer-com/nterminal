@@ -317,6 +317,7 @@ void MainWindow::setupComposeInput()
     m_composeEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_composeEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_composeEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_composeEdit->document()->setDocumentMargin(0);
     m_composeEdit->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
     m_composeEdit->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
