@@ -17,7 +17,7 @@ Last updated: 2026-04-18
 |---|---|---|---|---|
 | Claude Code `2.1.112` | W | W | W | Clear: single Ctrl+U. Inject: 100ms delay + bracketed paste. Submit: raw `\r` after 100ms. |
 | Codex CLI `0.118.0` | W | W | W | Uses shared fallback clear path (`Ctrl+K` x8, `Ctrl+U` x8). Enter-key submit after 100ms. |
-| Gemini CLI `0.38.1` | RT | W | W | Clear: Ctrl+E + Ctrl+U x8. Both transfer and submit paths: send `?` immediately (triggers help menu, puts Gemini in editing mode), 100ms delay, then text. Submit: raw `\r` after 200ms. `?` in text preserved because Gemini treats `?` as literal in editing mode. |
+| Gemini CLI `0.38.1` | W | W | W | Clear: Ctrl+E + Ctrl+U x8. Both transfer and submit paths: send `?` immediately (triggers help menu, puts Gemini in editing mode), 100ms delay, then text. Submit: raw `\r` after 200ms. `?` in text preserved because Gemini treats `?` as literal in editing mode. |
 
 Marcos notes: claude and codex never had issues with the question mark: only gemini.
 
