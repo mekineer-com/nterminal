@@ -327,8 +327,9 @@ void MainWindow::setupComposeInput()
 
     m_composeEdit->viewport()->installEventFilter(this);
 
-    connect(m_composeEdit->document(), &QTextDocument::contentsChanged,
-            this, &MainWindow::updateComposeHeight);
+    connect(m_composeEdit->document(), &QTextDocument::contentsChanged, this, [this]() {
+        QTimer::singleShot(0, this, &MainWindow::updateComposeHeight);
+    });
 
     QShortcut *sendShortcutReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_composeEdit);
     connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
