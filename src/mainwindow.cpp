@@ -572,6 +572,8 @@ void MainWindow::transferComposeToTerminal()
     QString text = m_composeEdit->toPlainText();
     if (text.isEmpty())
     {
+        // Nothing to transfer — move focus to the terminal.
+        focusActiveTerminal();
         return;
     }
 
@@ -656,6 +658,8 @@ void MainWindow::transferTerminalSelectionToCompose()
                 const QString normalized = normalizedTerminalSelection(source);
                 if (normalized.isEmpty())
                 {
+                    // Nothing to transfer — move focus to the compose editor.
+                    m_composeEdit->setFocus(Qt::OtherFocusReason);
                     return;
                 }
                 m_composeEdit->setPlainText(normalized);
