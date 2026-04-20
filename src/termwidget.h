@@ -90,6 +90,7 @@ class TermWidget : public QWidget, public DBusAddressable
         // fallback because fullscreen TUI apps (e.g. Claude Code) invalidate
         // Konsole's live selection via frequent alt-screen repaints.
         QString lastSelectedText() const { return m_lastSelectedText; }
+        void clearLastSelectedText() { m_lastSelectedText.clear(); }
 
         #ifdef HAVE_QDBUS
         QDBusObjectPath splitHorizontal(const QHash<QString,QVariant> &termArgs);
