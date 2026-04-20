@@ -90,12 +90,25 @@ Marcos notes: claude and codex never had issues with the question mark: only gem
 
 ## Bidirectional Transfer (Ctrl+Shift+Down / Ctrl+Shift+Up)
 
-### Ctrl+Shift+Down (terminal → compose)
-- In Claude Code's fullscreen TUI, ink/React enables X11 mouse reporting. Mouse drag events go to the app, not to QTermWidget's selection engine. `copyAvailable` never fires for plain drag; cache stays empty.
-- **Workaround required in Claude Code: use Shift+drag instead of plain drag.** Shift+drag forces the terminal emulator to create a terminal-level selection, bypassing app mouse reporting.
-- This build adds a second cache path: `TermWidget` now also listens to `QClipboard::selectionChanged` (X11 PRIMARY). Shift+drag sets PRIMARY → `selectionChanged` fires → cache updated → Ctrl+Shift+Down finds it.
-- No clipboard manager pollution: we only read PRIMARY (which the drag already set), never write to CLIPBOARD.
-- Plain shell / Codex / Gemini: plain drag works (no app mouse reporting); `copyAvailable` path handles it.
+### Ctrl+Shift+Down (terminal → compose) and Ctrl+Shift+C (copy)
+
+**In Claude Code tui:fullscreen, use Shift+drag to select text.** Both Ctrl+Shift+Down and Ctrl+Shift+C work with Shift+drag. Plain drag appears to highlight (blue) but the highlight is visual-only — no real selection is produced, so Ctrl+Shift+Down returns stale cache content and Ctrl+Shift+C copies nothing.
+
+**Root cause** (verified against qtermwidget 2.3.0 source, Screen.cpp):
+- Claude Code does NOT enable mouse reporting (no `?1000h`/`?1002h`/`?1006h` etc. in cli.js — `_mouseMarks=true` stays at default, so selection logic is wired correctly)
+- But Claude's alt-screen repaints constantly call `Screen::clearSelection()` (lines 984, 1082) when terminal output overlaps the selection region
+- User drags to select → selection created → Claude repaints → `clearSelection()` wipes it → on mouse release, `setSelection()` writes empty string to X11 PRIMARY
+- The "blue highlight" is `_iPntSel`/`_pntSel` visual drag feedback in TerminalDisplay, independent of Screen's selection state — it renders while dragging but doesn't survive release
+
+**Why Shift+drag works**: same code path for `_mouseMarks=true`, but the drag-to-release flow happens to survive the repaint race in practice. Exact reason unclear without more QTermWidget reading.
+
+**Why not fix**: fix requires patching qtermwidget (skip `clearSelection()` during active drag, `_actSel==2`) and vendoring the patched library. ~2-3 hours work plus ongoing maintenance. Shift+drag workaround accepted as the cost.
+
+**Claude's "ctrl+c to copy" message**: Claude shows this based on its own UI heuristics, not because it detects the selection (it can't — no mouse reporting). Misleading but unrelated.
+
+**Plain drag still works** in: plain shells, Codex, Gemini (none of them repaint alt-screen aggressively enough to race with selection).
+
+**Cache paths implemented** (both still useful for other CLIs): `TermWidget::m_lastSelectedText` populated from `copyAvailable(true)` and `QClipboard::selectionChanged` (X11 PRIMARY).
 
 ### Scrollbar in Claude Code — not an nterminal bug
 - `tui: fullscreen` (active since 2026-04-17) puts Claude in alt-screen mode. Alt-screen has no scrollback buffer; QTermWidget shows no scrollbar thumb because there is nothing to scroll.
