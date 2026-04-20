@@ -24,8 +24,6 @@
 #include <QActionGroup>
 #include <QMessageBox>
 #include <QTimer>
-#include <QGuiApplication>
-#include <QClipboard>
 
 #include "mainwindow.h"
 #include "termwidgetholder.h"
@@ -163,20 +161,7 @@ void TabWidget::splitCollapse()
 
 void TabWidget::copySelection()
 {
-    TermWidget *term = terminalHolder()->currentTerminal();
-    TermWidgetImpl *impl = term->impl();
-
-    // Try live QTermWidget selection first (preserves formatting).
-    if (!impl->selectedText(true).isEmpty())
-    {
-        impl->copyClipboard();
-        return;
-    }
-    // Fall back to cache — needed for Claude Code's fullscreen TUI where
-    // alt-screen repaints invalidate the live selection before copy fires.
-    const QString cached = term->lastSelectedText();
-    if (!cached.isEmpty())
-        QGuiApplication::clipboard()->setText(cached);
+    terminalHolder()->currentTerminal()->impl()->copyClipboard();
 }
 
 void TabWidget::pasteClipboard()
