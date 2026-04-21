@@ -662,9 +662,10 @@ void MainWindow::transferTerminalSelectionToCompose()
                     m_composeEdit->setFocus(Qt::OtherFocusReason);
                     return;
                 }
-                m_composeEdit->setPlainText(normalized);
-                updateComposeHeight();
                 setRawInputMode(false);
+                m_composeEdit->setFocus(Qt::OtherFocusReason);
+                m_composeEdit->insertPlainText(normalized);
+                updateComposeHeight();
                 // Consume the cached selection so the next Ctrl+Shift+Down
                 // without a fresh selection moves focus instead of re-transferring.
                 term->clearLastSelectedText();
