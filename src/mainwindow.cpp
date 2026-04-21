@@ -592,15 +592,41 @@ void MainWindow::transferComposeToTerminal()
         {
             if (TermWidgetImpl *impl = term->impl())
             {
-                // Transfer inserts at the terminal input cursor — no clear.
-                // Symmetric with terminal→editor (which inserts at editor cursor).
-                // For Claude, still use bracketed paste to avoid line-boundary blocks
-                // from raw \n in its multi-line input widget.
+                clearTerminalInputBestEffort(impl);
                 if (detectComposeCli(impl) == ComposeCli::Claude)
-                    impl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                {
+                    // Claude's async input handler needs time to process the
+                    // clear key events before new text arrives (same as submit path).
+                    // Also use bracketed paste so \n is treated as literal newline,
+                    // not a line-boundary that creates an unbackspaceable block.
+                    QTimer::singleShot(100, this, [this, text]() {
+                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
+                        if (TermWidget *t = h->currentTerminal())
+                        if (TermWidgetImpl *i = t->impl())
+                        {
+                            i->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+                            focusActiveTerminal();
+                        }
+                    });
+                }
+                else if (detectComposeCli(impl) == ComposeCli::Gemini)
+                {
+                    impl->sendText(QStringLiteral("?"));
+                    QTimer::singleShot(100, this, [this, text]() {
+                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
+                        if (TermWidget *t = h->currentTerminal())
+                        if (TermWidgetImpl *i = t->impl())
+                        {
+                            i->sendText(text);
+                            focusActiveTerminal();
+                        }
+                    });
+                }
                 else
+                {
                     impl->sendText(text);
-                focusActiveTerminal();
+                    focusActiveTerminal();
+                }
             }
         }
     }
@@ -636,10 +662,9 @@ void MainWindow::transferTerminalSelectionToCompose()
                     m_composeEdit->setFocus(Qt::OtherFocusReason);
                     return;
                 }
-                setRawInputMode(false);
-                m_composeEdit->setFocus(Qt::OtherFocusReason);
-                m_composeEdit->insertPlainText(normalized);
+                m_composeEdit->setPlainText(normalized);
                 updateComposeHeight();
+                setRawInputMode(false);
                 // Consume the cached selection so the next Ctrl+Shift+Down
                 // without a fresh selection moves focus instead of re-transferring.
                 term->clearLastSelectedText();
