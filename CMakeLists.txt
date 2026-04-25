@@ -36,8 +36,11 @@ if(UNIX)
     find_package(Qt6DBus ${QT_MINIMUM_VERSION} REQUIRED)
     find_package(Qt6 COMPONENTS Core REQUIRED)
 endif()
-find_package(QTermWidget6 ${QTERMWIDGET_MINIMUM_VERSION} REQUIRED)
 find_package(lxqt2-build-tools ${LXQTBT_MINIMUM_VERSION} REQUIRED)
+set(QTERMWIDGET_INSTALL_PREFIX_SAVE "${CMAKE_INSTALL_PREFIX}")
+set(CMAKE_INSTALL_PREFIX "/usr")
+add_subdirectory(lib/qtermwidget)
+set(CMAKE_INSTALL_PREFIX "${QTERMWIDGET_INSTALL_PREFIX_SAVE}")
 
 if (BUILD_TESTS)
     find_package(Qt6 ${QT_MINIMUM_VERSION} CONFIG REQUIRED Test)
@@ -71,6 +74,7 @@ set(EXE_NAME qterminal)
 
 set(QTERM_SRC
     src/main.cpp
+    src/compose.cpp
     src/mainwindow.cpp
     src/tabbar.cpp
     src/tabwidget.cpp
@@ -88,6 +92,7 @@ set(QTERM_SRC
 
 set(QTERM_MOC_SRC
     src/qterminalapp.h
+    src/compose.h
     src/mainwindow.h
     src/tabbar.h
     src/tabwidget.h
@@ -159,6 +164,7 @@ lxqt_translate_desktop(DESKTOP_FILES
 include_directories(
     "${PROJECT_SOURCE_DIR}"
     "${PROJECT_SOURCE_DIR}/src"
+    "${PROJECT_SOURCE_DIR}/lib/qtermwidget/lib"
     "${PROJECT_BINARY_DIR}"
     ${QXT_INCLUDE_DIRS}
 )

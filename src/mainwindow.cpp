@@ -24,22 +24,14 @@
 #include <QMessageBox>
 #include <QStandardPaths>
 #include <QTimer>
-#include <functional>
 #include <QGuiApplication>
 #include <QActionGroup>
 #include <QGridLayout>
-#include <QPlainTextEdit>
 #include <QShortcut>
 #include <QFrame>
-#include <QTextOption>
-#include <QTextDocument>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QRegularExpression>
 #include <QFile>
-#include <cmath>
-#include <algorithm>
-#include <limits>
 
 #ifdef HAVE_QDBUS
 #include <QtDBus/QtDBus>
@@ -48,6 +40,7 @@
 
 #include "terminalconfig.h"
 #include "mainwindow.h"
+#include "compose.h"
 #include "tabwidget.h"
 #include "termwidgetholder.h"
 #include "config.h"
@@ -62,107 +55,6 @@
 
 typedef std::function<bool(MainWindow&, QAction *)> checkfn;
 Q_DECLARE_METATYPE(checkfn)
-
-namespace
-{
-enum class ComposeCli
-{
-    Unknown,
-    Claude,
-    Codex,
-    Gemini
-};
-
-QString readProcCmdline(int pid)
-{
-    if (pid <= 0)
-    {
-        return QString();
-    }
-
-    QFile file(QStringLiteral("/proc/%1/cmdline").arg(pid));
-    if (!file.open(QIODevice::ReadOnly))
-    {
-        return QString();
-    }
-
-    QByteArray raw = file.readAll();
-    if (raw.isEmpty())
-    {
-        return QString();
-    }
-
-    raw.replace('\0', ' ');
-    return QString::fromLocal8Bit(raw).trimmed();
-}
-
-ComposeCli detectComposeCli(TermWidgetImpl *impl)
-{
-    if (impl == nullptr)
-    {
-        return ComposeCli::Unknown;
-    }
-
-    const int foregroundPid = impl->getForegroundProcessId();
-    const int shellPid = impl->getShellPID();
-
-    const QStringList candidates = {
-        readProcCmdline(foregroundPid),
-        readProcCmdline(shellPid)
-    };
-
-    for (const QString &candidate : candidates)
-    {
-        if (candidate.isEmpty())
-        {
-            continue;
-        }
-
-        const QString cmd = candidate.toLower();
-        if (cmd.contains(QStringLiteral("claude")))
-        {
-            return ComposeCli::Claude;
-        }
-        if (cmd.contains(QStringLiteral("codex")))
-        {
-            return ComposeCli::Codex;
-        }
-        if (cmd.contains(QStringLiteral("gemini")))
-        {
-            return ComposeCli::Gemini;
-        }
-    }
-
-    return ComposeCli::Unknown;
-}
-
-void sendCtrlKey(TermWidgetImpl *impl, int key)
-{
-    if (impl == nullptr)
-    {
-        return;
-    }
-
-    QKeyEvent keyPress(QEvent::KeyPress, key, Qt::ControlModifier, QString());
-    QKeyEvent keyRelease(QEvent::KeyRelease, key, Qt::ControlModifier, QString());
-    impl->sendKeyEvent(&keyPress);
-    impl->sendKeyEvent(&keyRelease);
-}
-
-void sendKey(TermWidgetImpl *impl, int key)
-{
-    if (impl == nullptr)
-    {
-        return;
-    }
-
-    QKeyEvent keyPress(QEvent::KeyPress, key, Qt::NoModifier, QString());
-    QKeyEvent keyRelease(QEvent::KeyRelease, key, Qt::NoModifier, QString());
-    impl->sendKeyEvent(&keyPress);
-    impl->sendKeyEvent(&keyRelease);
-}
-
-} // namespace
 
 MainWindow::MainWindow(TerminalConfig &cfg,
                        bool dropMode,
@@ -182,10 +74,7 @@ MainWindow::MainWindow(TerminalConfig &cfg,
       m_dropLockButton(nullptr),
       m_dropMode(dropMode),
       m_layerWindow(nullptr),
-      m_nterminalCompose(false),
-      m_composeRawMode(false),
-      m_composeEdit(nullptr),
-      m_toggleComposeAction(nullptr)
+      m_compose(nullptr)
 {
 #ifdef HAVE_QDBUS
     registerAdapter<WindowAdaptor, MainWindow>(this);
@@ -268,10 +157,10 @@ MainWindow::MainWindow(TerminalConfig &cfg,
        the main window; otherwise, the initial prompt might
        get jumbled because of changes in internal geometry. */
     addNewTab(m_config);
-    if (m_nterminalCompose)
+    if (m_compose != nullptr && m_compose->isActive())
     {
-        setRawInputMode(false);
-        focusActiveTerminal();
+        m_compose->setRawInputMode(false);
+        m_compose->focusTerminal();
     }
 }
 
@@ -294,516 +183,34 @@ MainWindow::~MainWindow()
 
 void MainWindow::setupComposeInput()
 {
-    const QString appName = QCoreApplication::applicationName().toLower();
-    m_nterminalCompose = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
-        || appName.contains(QStringLiteral("nterminal"));
-    if (!m_nterminalCompose)
-    {
-        return;
-    }
-
     auto *layout = qobject_cast<QGridLayout*>(centralwidget->layout());
-    if (layout == nullptr)
-    {
-        return;
-    }
+    if (layout == nullptr) return;
 
-    m_composeEdit = new QPlainTextEdit(centralwidget);
-    m_composeEdit->setObjectName(QStringLiteral("composeInput"));
-    m_composeEdit->setFrameShape(QFrame::NoFrame);
-    m_composeEdit->setTabChangesFocus(false);
-    m_composeEdit->setUndoRedoEnabled(true);
-    m_composeEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_composeEdit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_composeEdit->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    m_composeEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_composeEdit->document()->setDocumentMargin(0);
-    m_composeEdit->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
-    m_composeEdit->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
+    m_compose = new ComposeInput(centralwidget, layout, consoleTabulator, this);
+    if (!m_compose->isActive()) return;
 
-    layout->addWidget(m_composeEdit, 1, 0);
-    layout->setRowStretch(0, 1);
-    layout->setRowStretch(1, 0);
+    auto *toCompose = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);
+    connect(toCompose, &QShortcut::activated, m_compose, &ComposeInput::transferFromTerminal);
 
-    m_composeEdit->viewport()->installEventFilter(this);
+    auto *toTerminal = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Up), this);
+    connect(toTerminal, &QShortcut::activated, m_compose, &ComposeInput::transferToTerminal);
 
-    connect(m_composeEdit->document(), &QTextDocument::contentsChanged, this, [this]() {
-        QTimer::singleShot(0, this, &MainWindow::updateComposeHeight);
+    auto *toggle = new QAction(this);
+    toggle->setShortcut(QKeySequence(QStringLiteral("F6")));
+    toggle->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+    connect(toggle, &QAction::triggered, this, [this]() {
+        m_compose->setRawInputMode(!m_compose->editor()->isVisible());
     });
-
-    QShortcut *sendShortcutReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_composeEdit);
-    connect(sendShortcutReturn, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
-    QShortcut *sendShortcutEnter = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Enter), m_composeEdit);
-    connect(sendShortcutEnter, &QShortcut::activated, this, &MainWindow::sendComposeToTerminal);
-
-    QShortcut *toComposeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);
-    connect(toComposeShortcut, &QShortcut::activated, this, &MainWindow::transferTerminalSelectionToCompose);
-
-    QShortcut *toTerminalShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Up), this);
-    connect(toTerminalShortcut, &QShortcut::activated, this, &MainWindow::transferComposeToTerminal);
-
-    m_toggleComposeAction = new QAction(this);
-    m_toggleComposeAction->setShortcut(QKeySequence(QStringLiteral("F6")));
-    m_toggleComposeAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-    connect(m_toggleComposeAction, &QAction::triggered, this, [this]() {
-        setRawInputMode(!m_composeRawMode);
-    });
-    addAction(m_toggleComposeAction);
-
-    updateComposeHeight();
-    setRawInputMode(false);
-}
-
-void MainWindow::updateComposeHeight()
-{
-    if (m_composeEdit == nullptr)
-    {
-        return;
-    }
-
-    bool ok = false;
-    int maxLines = qEnvironmentVariableIntValue("NTERMINAL_COMPOSE_MAX_LINES", &ok);
-    if (!ok || maxLines < 2)
-    {
-        maxLines = 12;
-    }
-
-    const qreal docHeight = m_composeEdit->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
-    visualLines = std::min(visualLines, maxLines);
-
-    const QFontMetrics fm(m_composeEdit->font());
-    const int padding = 8;
-    const int frame = m_composeEdit->frameWidth() * 2;
-    m_composeEdit->setFixedHeight(frame + padding + (visualLines * fm.lineSpacing()));
+    addAction(toggle);
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (m_composeEdit != nullptr && watched == m_composeEdit->viewport()
-        && event->type() == QEvent::MouseMove)
+    if (m_compose != nullptr && m_compose->viewportEventFilter(watched, event))
     {
-        auto *me = static_cast<QMouseEvent*>(event);
-        // Only swallow MouseMove during active left-button drag in the compose
-        // editor. Without this guard, the filter fires on plain hover motion and
-        // has been observed to cause knock-on effects outside compose.
-        if (m_composeEdit->isVisible() && (me->buttons() & Qt::LeftButton))
-        {
-            const QRect r = m_composeEdit->viewport()->rect();
-            if (!r.contains(me->position().toPoint()))
-            {
-                return true;
-            }
-        }
+        return true;
     }
     return QMainWindow::eventFilter(watched, event);
-}
-
-void MainWindow::focusActiveTerminal()
-{
-    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
-    {
-        if (TermWidget *term = holder->currentTerminal())
-        {
-            if (TermWidgetImpl *impl = term->impl())
-            {
-                impl->setFocus(Qt::OtherFocusReason);
-            }
-        }
-    }
-}
-
-void MainWindow::setRawInputMode(bool rawMode)
-{
-    if (m_composeEdit == nullptr)
-    {
-        return;
-    }
-
-    m_composeRawMode = rawMode;
-    m_composeEdit->setVisible(!rawMode);
-
-    if (rawMode)
-    {
-        focusActiveTerminal();
-    }
-    else
-    {
-        updateComposeHeight();
-        m_composeEdit->setFocus(Qt::OtherFocusReason);
-    }
-}
-
-QString MainWindow::normalizedTerminalSelection(const QString &text) const
-{
-    QString cleaned = text;
-    cleaned.remove(QLatin1Char('\r'));
-
-    static const QRegularExpression trailingWhitespace(QStringLiteral("[ \\t]+(?=\\n|$)"));
-    cleaned.replace(trailingWhitespace, QString());
-
-    while (cleaned.startsWith(QLatin1Char('\n')))
-    {
-        cleaned.remove(0, 1);
-    }
-    while (cleaned.endsWith(QLatin1Char('\n')))
-    {
-        cleaned.chop(1);
-    }
-
-    // QTermWidget may add soft-wrap indentation (commonly two spaces) to
-    // continuation lines in copied selections. Remove that artifact only when
-    // first line is unindented and all later non-empty lines share >=2 spaces.
-    QStringList lines = cleaned.split(QLatin1Char('\n'), Qt::KeepEmptyParts);
-    if (lines.size() > 1)
-    {
-        const QString &first = lines.at(0);
-        const bool firstIndented = first.startsWith(QLatin1Char(' ')) || first.startsWith(QLatin1Char('\t'));
-
-        int minContinuationIndent = std::numeric_limits<int>::max();
-        bool sawContinuation = false;
-        bool allContinuationHaveIndent = true;
-
-        for (int i = 1; i < lines.size(); ++i)
-        {
-            const QString &line = lines.at(i);
-            if (line.isEmpty())
-            {
-                continue;
-            }
-
-            sawContinuation = true;
-            int spaces = 0;
-            while (spaces < line.size() && line.at(spaces) == QLatin1Char(' '))
-            {
-                ++spaces;
-            }
-            if (spaces == 0)
-            {
-                allContinuationHaveIndent = false;
-                break;
-            }
-            minContinuationIndent = std::min(minContinuationIndent, spaces);
-        }
-
-        if (!firstIndented && sawContinuation && allContinuationHaveIndent && minContinuationIndent >= 2)
-        {
-            for (int i = 1; i < lines.size(); ++i)
-            {
-                QString &line = lines[i];
-                int toRemove = 0;
-                while (toRemove < 2 && toRemove < line.size() && line.at(toRemove) == QLatin1Char(' '))
-                {
-                    ++toRemove;
-                }
-                if (toRemove > 0)
-                {
-                    line.remove(0, toRemove);
-                }
-            }
-            cleaned = lines.join(QLatin1Char('\n'));
-        }
-    }
-
-    return cleaned;
-}
-
-void MainWindow::clearTerminalInputBestEffort(TermWidgetImpl *impl)
-{
-    if (impl == nullptr)
-    {
-        return;
-    }
-
-    const ComposeCli cli = detectComposeCli(impl);
-
-    if (cli == ComposeCli::Claude)
-    {
-        impl->sendText(QStringLiteral("\x15")); // Ctrl+U clears full input
-        return;
-    }
-
-    if (cli == ComposeCli::Gemini)
-    {
-        // Gemini path: move to bottom line, then line end, then repeated clear-backstep passes.
-        constexpr int kGeminiDownPasses = 8;
-        for (int i = 0; i < kGeminiDownPasses; ++i)
-        {
-            sendKey(impl, Qt::Key_Down);
-        }
-        impl->sendText(QString(QChar(0x05))); // Ctrl+E
-        constexpr int kGeminiPasses = 8;
-        for (int i = 0; i < kGeminiPasses; ++i)
-        {
-            impl->sendText(QString(QChar(0x15))); // Ctrl+U
-            sendKey(impl, Qt::Key_Backspace);
-        }
-        return;
-    }
-
-    if (cli == ComposeCli::Codex)
-    {
-        // Codex path: explicit dedicated strategy.
-        constexpr int kCodexPasses = 8;
-        for (int i = 0; i < kCodexPasses; ++i)
-        {
-            sendCtrlKey(impl, Qt::Key_K);
-            sendCtrlKey(impl, Qt::Key_U);
-        }
-        return;
-    }
-
-    // Unknown CLI fallback path.
-    constexpr int kUnknownPasses = 8;
-    for (int i = 0; i < kUnknownPasses; ++i)
-    {
-        sendCtrlKey(impl, Qt::Key_K);
-        sendCtrlKey(impl, Qt::Key_U);
-    }
-}
-
-void MainWindow::transferComposeToTerminal()
-{
-    if (m_composeEdit == nullptr)
-    {
-        return;
-    }
-
-    QString text = m_composeEdit->toPlainText();
-    if (text.isEmpty())
-    {
-        // Nothing to transfer — move focus to the terminal.
-        focusActiveTerminal();
-        return;
-    }
-
-    if (text.endsWith(QStringLiteral("\r\n")))
-    {
-        text.chop(2);
-    }
-    else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r')))
-    {
-        text.chop(1);
-    }
-
-    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
-    {
-        if (TermWidget *term = holder->currentTerminal())
-        {
-            if (TermWidgetImpl *impl = term->impl())
-            {
-                clearTerminalInputBestEffort(impl);
-                if (detectComposeCli(impl) == ComposeCli::Claude)
-                {
-                    // Claude's async input handler needs time to process the
-                    // clear key events before new text arrives (same as submit path).
-                    // Also use bracketed paste so \n is treated as literal newline,
-                    // not a line-boundary that creates an unbackspaceable block.
-                    QTimer::singleShot(100, this, [this, text]() {
-                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
-                        if (TermWidget *t = h->currentTerminal())
-                        if (TermWidgetImpl *i = t->impl())
-                        {
-                            i->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
-                            focusActiveTerminal();
-                        }
-                    });
-                }
-                else if (detectComposeCli(impl) == ComposeCli::Gemini)
-                {
-                    impl->sendText(QStringLiteral("?"));
-                    QTimer::singleShot(100, this, [this, text]() {
-                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
-                        if (TermWidget *t = h->currentTerminal())
-                        if (TermWidgetImpl *i = t->impl())
-                        {
-                            i->sendText(text);
-                            focusActiveTerminal();
-                        }
-                    });
-                }
-                else
-                {
-                    impl->sendText(text);
-                    focusActiveTerminal();
-                }
-            }
-        }
-    }
-}
-
-void MainWindow::transferTerminalSelectionToCompose()
-{
-    if (m_composeEdit == nullptr)
-    {
-        return;
-    }
-
-    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
-    {
-        if (TermWidget *term = holder->currentTerminal())
-        {
-            if (TermWidgetImpl *impl = term->impl())
-            {
-                // In Claude Code's fullscreen/alt-screen mode, the app's frequent
-                // repaints invalidate Konsole's live selection, so selectedText()
-                // returns empty at shortcut time. TermWidget caches the text at
-                // copyAvailable(true); fall back to that.
-                QString source = impl->selectedText(true);
-                if (source.isEmpty())
-                {
-                    source = term->lastSelectedText();
-                }
-
-                const QString normalized = normalizedTerminalSelection(source);
-                if (normalized.isEmpty())
-                {
-                    // Nothing to transfer — move focus to the compose editor.
-                    m_composeEdit->setFocus(Qt::OtherFocusReason);
-                    return;
-                }
-                setRawInputMode(false);
-                m_composeEdit->setFocus(Qt::OtherFocusReason);
-                m_composeEdit->insertPlainText(normalized);
-                updateComposeHeight();
-                // Consume the cached selection so the next Ctrl+Shift+Down
-                // without a fresh selection moves focus instead of re-transferring.
-                term->clearLastSelectedText();
-            }
-        }
-    }
-}
-
-void MainWindow::sendComposeToTerminal()
-{
-    if (m_composeEdit == nullptr)
-    {
-        return;
-    }
-
-    QString text = m_composeEdit->toPlainText();
-    if (text.trimmed().isEmpty())
-    {
-        return;
-    }
-
-    if (TermWidgetHolder *holder = consoleTabulator->terminalHolder())
-    {
-        if (TermWidget *term = holder->currentTerminal())
-        {
-            if (TermWidgetImpl *impl = term->impl())
-            {
-                const ComposeCli submitCli = detectComposeCli(impl);
-                clearTerminalInputBestEffort(impl);
-                // Ctrl+Enter can insert a trailing newline in the compose editor before submit.
-                // Keep multiline content, but drop one accidental trailing line break.
-                if (text.endsWith(QStringLiteral("\r\n")))
-                {
-                    text.chop(2);
-                }
-                else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r')))
-                {
-                    text.chop(1);
-                }
-
-                if (submitCli == ComposeCli::Claude)
-                {
-                    // Claude submit path:
-                    // 1) wait 100ms after clear before inserting text
-                    // 2) wait 100ms after insert before raw carriage return submit
-                    QTimer::singleShot(100, this, [this, text]() {
-                        if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
-                        {
-                            if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
-                            {
-                                if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
-                                {
-                                    delayedImpl->sendText(text);
-                                    QTimer::singleShot(100, this, [this]() {
-                                        if (TermWidgetHolder *submitHolder = consoleTabulator->terminalHolder())
-                                        {
-                                            if (TermWidget *submitTerm = submitHolder->currentTerminal())
-                                            {
-                                                if (TermWidgetImpl *submitImpl = submitTerm->impl())
-                                                {
-                                                    submitImpl->sendText(QString(QLatin1Char('\r')));
-                                                }
-                                            }
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                    });
-                }
-                else if (submitCli == ComposeCli::Gemini)
-                {
-                    impl->sendText(QStringLiteral("?"));
-                    QTimer::singleShot(100, this, [this, text]() {
-                        if (TermWidgetHolder *h = consoleTabulator->terminalHolder())
-                        if (TermWidget *t = h->currentTerminal())
-                        if (TermWidgetImpl *i = t->impl())
-                        {
-                            i->sendText(text);
-                            QTimer::singleShot(200, this, [this]() {
-                                if (TermWidgetHolder *h2 = consoleTabulator->terminalHolder())
-                                if (TermWidget *t2 = h2->currentTerminal())
-                                if (TermWidgetImpl *i2 = t2->impl())
-                                    i2->sendText(QString(QLatin1Char('\r')));
-                            });
-                        }
-                    });
-                }
-                else if (submitCli == ComposeCli::Codex)
-                {
-                    // Codex path: explicit dedicated submit flow.
-                    impl->sendText(text);
-                    QTimer::singleShot(100, this, [this]() {
-                        if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
-                        {
-                            if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
-                            {
-                                if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
-                                {
-                                    sendKey(delayedImpl, Qt::Key_Return);
-                                }
-                            }
-                        }
-                    });
-                }
-                else
-                {
-                    // Unknown CLI (bash, zsh, etc.) submit flow.
-                    // Use sendText("\r") — exactly one byte — not sendKey(Return) which
-                    // sends both KeyPress and KeyRelease and causes an extra Enter in readline.
-                    impl->sendText(text);
-                    QTimer::singleShot(100, this, [this]() {
-                        if (TermWidgetHolder *delayedHolder = consoleTabulator->terminalHolder())
-                        {
-                            if (TermWidget *delayedTerm = delayedHolder->currentTerminal())
-                            {
-                                if (TermWidgetImpl *delayedImpl = delayedTerm->impl())
-                                {
-                                    delayedImpl->sendText(QString(QLatin1Char('\r')));
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-        }
-    }
-
-    m_composeEdit->clear();
-    updateComposeHeight();
-    if (m_composeRawMode)
-    {
-        focusActiveTerminal();
-    }
-    else
-    {
-        m_composeEdit->setFocus(Qt::OtherFocusReason);
-    }
 }
 
 void MainWindow::enableDropMode()

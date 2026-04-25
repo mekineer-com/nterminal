@@ -1,0 +1,3 @@
+[submodule "lib/qtermwidget"]
+	path = lib/qtermwidget
+	url = https://github.com/mekineer-com/qtermwidget.git

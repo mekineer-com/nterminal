@@ -33,8 +33,7 @@ namespace LayerShellQt {
 }
 
 class QToolButton;
-class QPlainTextEdit;
-class TermWidgetImpl;
+class ComposeInput;
 
 class MainWindow : public QMainWindow, private Ui::mainWindow, public DBusAddressable
 {
@@ -101,19 +100,8 @@ private:
     void setDropShortcut(const QKeySequence& dropShortCut);
     void setDropLockShortCut(const QKeySequence& dropLockShortCut);
 
-    bool m_nterminalCompose;
-    bool m_composeRawMode;
-    QPlainTextEdit *m_composeEdit;
-    QAction *m_toggleComposeAction;
+    ComposeInput *m_compose = nullptr;
     void setupComposeInput();
-    void updateComposeHeight();
-    void setRawInputMode(bool rawMode);
-    void sendComposeToTerminal();
-    void focusActiveTerminal();
-    void clearTerminalInputBestEffort(TermWidgetImpl *impl);
-    void transferComposeToTerminal();
-    void transferTerminalSelectionToCompose();
-    QString normalizedTerminalSelection(const QString &text) const;
 
     bool hasMultipleTabs(QAction *);
     bool hasMultipleSubterminals(QAction *);

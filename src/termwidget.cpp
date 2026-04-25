@@ -120,13 +120,17 @@ void TermWidgetImpl::propertiesChanged()
     setTrimPastedTrailingNewlines(Properties::Instance()->trimPastedTrailingNewlines);
     setTerminalSizeHint(Properties::Instance()->showTerminalSizeHint);
 
-    if (Properties::Instance()->historyLimited)
+    if (qEnvironmentVariableIsSet("NTERMINAL_COMPOSE"))
+    {
+        // Capped history + SIGWINCH redraws evict the user's scroll position.
+        setHistorySize(-1);
+    }
+    else if (Properties::Instance()->historyLimited)
     {
         setHistorySize(Properties::Instance()->historyLimitedTo);
     }
     else
     {
-        // Unlimited history
         setHistorySize(-1);
     }
 
@@ -333,7 +337,12 @@ TermWidget::TermWidget(TerminalConfig &cfg, QWidget *parent)
     // Also cache via X11 PRIMARY selection. In Claude Code's fullscreen TUI,
     // mouse events go to the app so copyAvailable never fires for normal drag.
     // Shift+drag bypasses app mouse reporting and sets PRIMARY directly.
+    // Gate on focus so unrelated apps' PRIMARY changes don't leak into the
+    // cache and resurrect a stale selection after clearLastSelectedText().
     connect(QGuiApplication::clipboard(), &QClipboard::selectionChanged, this, [this]() {
+        QWidget *fw = QApplication::focusWidget();
+        if (fw == nullptr || !this->isAncestorOf(fw))
+            return;
         const QString sel = QGuiApplication::clipboard()->text(QClipboard::Selection);
         if (!sel.isEmpty())
             m_lastSelectedText = sel;

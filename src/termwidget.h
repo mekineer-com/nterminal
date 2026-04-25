@@ -19,7 +19,7 @@
 #ifndef TERMWIDGET_H
 #define TERMWIDGET_H
 
-#include <qtermwidget6/qtermwidget.h>
+#include <qtermwidget.h>
 
 #include "terminalconfig.h"
 
