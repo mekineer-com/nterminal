@@ -45,15 +45,34 @@ This project is licensed under the terms of the [GPLv2](https://www.gnu.org/lice
 
 ## Installation
 
-### Compiling sources
+### Cloning
 
-Dependencies Qt ≥ 6.6.0 and [QTermWidget](https://github.com/lxqt/qtermwidget).
-Optional dependencies include [libcanberra](https://0pointer.net/lennart/projects/libcanberra/) for playing bells.
-In order to build CMake ≥ 3.18.0 and [lxqt-build-tools](https://github.com/lxqt/lxqt-build-tools) are needed as well as optionally Git to pull latest VCS checkouts.
+NTerminal vendors a patched [QTermWidget](https://github.com/mekineer-com/qtermwidget) as a git submodule. You must clone with `--recurse-submodules`:
 
-Code configuration is handled by CMake. Building out of source is required. CMake variable `CMAKE_INSTALL_PREFIX` will normally have to be set to `/usr`.
+```
+git clone --recurse-submodules https://github.com/mekineer-com/nterminal.git
+cd nterminal
+```
 
-To build run `make`, to install `make install` which accepts variable `DESTDIR` as usual.
+If you already cloned without it:
+
+```
+git submodule update --init
+```
+
+### Building
+
+Dependencies: Qt ≥ 6.6.0, [lxqt-build-tools](https://github.com/lxqt/lxqt-build-tools), CMake ≥ 3.18.0. Optional: [libcanberra](https://0pointer.net/lennart/projects/libcanberra/) for bell sounds.
+
+No separate QTermWidget install is needed — nterminal builds it from the vendored submodule.
+
+```
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+```
+
+To install: `make install` (accepts `DESTDIR` as usual).
 
 ### Binary packages
 
