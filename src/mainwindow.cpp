@@ -898,8 +898,19 @@ void MainWindow::setKeepOpen(bool value)
 
 void MainWindow::find()
 {
-    // A bit ugly perhaps with 4 levels of indirection...
-    consoleTabulator->terminalHolder()->currentTerminal()->impl()->toggleShowSearchBar();
+    TermWidgetImpl *impl = consoleTabulator->terminalHolder()->currentTerminal()->impl();
+    if (m_compose != nullptr && m_compose->isActive())
+        impl->setSuppressPtyResize(true);
+
+    impl->toggleShowSearchBar();
+
+    if (m_compose != nullptr && m_compose->isActive())
+    {
+        QTimer::singleShot(0, this, [this]() {
+            if (TermWidgetImpl *i = m_compose->currentImpl())
+                i->setSuppressPtyResize(false);
+        });
+    }
 }
 
 void MainWindow::handleHistory()

@@ -127,15 +127,25 @@ void ComposeInput::updateHeight()
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
-    const int oldHeight = m_editor->height();
 
-    // Suppress pty resize while compose is taller than 1-line so TUI apps
-    // don't get SIGWINCH and redraw (which duplicates history). Unsuppress
-    // when compose shrinks back so the app learns the correct size.
-    if (TermWidgetImpl *impl = currentImpl())
-        impl->setSuppressPtyResize(newHeight > oldHeight || visualLines > 1);
+    const bool suppress = m_heightInitialized;
+    m_heightInitialized = true;
+
+    if (suppress)
+    {
+        if (TermWidgetImpl *impl = currentImpl())
+            impl->setSuppressPtyResize(true);
+    }
 
     m_editor->setFixedHeight(newHeight);
+
+    if (suppress)
+    {
+        QTimer::singleShot(0, this, [this]() {
+            if (TermWidgetImpl *impl = currentImpl())
+                impl->setSuppressPtyResize(false);
+        });
+    }
 }
 
 void ComposeInput::focusTerminal()

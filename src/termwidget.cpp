@@ -122,7 +122,6 @@ void TermWidgetImpl::propertiesChanged()
 
     if (qEnvironmentVariableIsSet("NTERMINAL_COMPOSE"))
     {
-        // Capped history + SIGWINCH redraws evict the user's scroll position.
         setHistorySize(-1);
     }
     else if (Properties::Instance()->historyLimited)

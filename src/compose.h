@@ -30,11 +30,10 @@ public:
     void focusTerminal();
 
     bool viewportEventFilter(QObject *watched, QEvent *event);
+    TermWidgetImpl *currentImpl();
 
 private:
     enum class Cli { Claude, Gemini, Codex, Unknown };
-
-    TermWidgetImpl *currentImpl();
     TermWidget *currentTermWidget();
     static Cli detectCli(TermWidgetImpl *impl);
     static void sendCtrlKey(TermWidgetImpl *impl, int key);
@@ -48,6 +47,7 @@ private:
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
+    bool m_heightInitialized = false;
 };
 
 #endif
