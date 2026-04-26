@@ -16,7 +16,6 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
-#include <csignal>
 
 #include "tabwidget.h"
 #include "termwidgetholder.h"
@@ -431,18 +430,6 @@ void ComposeInput::send()
 
     m_editor->clear();
     updateHeight();
-
-    // Claude's TUI leaves stale buffer content when the terminal grows back.
-    if (cli == Cli::Claude)
-    {
-        TermWidgetImpl *pokeImpl = currentImpl();
-        if (pokeImpl != nullptr)
-        {
-            const int pid = pokeImpl->getShellPID();
-            if (pid > 0)
-                QTimer::singleShot(50, this, [pid]() { kill(pid, SIGWINCH); });
-        }
-    }
 
     if (m_rawMode)
     {
