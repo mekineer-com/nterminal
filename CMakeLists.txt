@@ -11,6 +11,9 @@ include(GNUInstallDirs)
 # qterminal version
 set(QTERMINAL_VERSION "2.3.0")
 
+set(NTERMINAL_VERSION "0.1.0-alpha")
+add_definitions(-DNTERMINAL_VERSION=\"${NTERMINAL_VERSION}\")
+
 option(UPDATE_TRANSLATIONS "Update source translation translations/*.ts files" OFF)
 option(BUILD_TESTS "Builds tests" ON)
 
@@ -31,6 +34,7 @@ find_package(Qt6Core ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(Qt6Gui ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(Qt6LinguistTools ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(Qt6Widgets ${QT_MINIMUM_VERSION} REQUIRED)
+find_package(Qt6Network ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(LayerShellQt ${SHELLQT_MINIMUM_VERSION} REQUIRED)
 if(UNIX)
     find_package(Qt6DBus ${QT_MINIMUM_VERSION} REQUIRED)
@@ -76,6 +80,7 @@ set(QTERM_SRC
     src/main.cpp
     src/compose.cpp
     src/mainwindow.cpp
+    src/updatecheck.cpp
     src/tabbar.cpp
     src/tabwidget.cpp
     src/termwidget.cpp
@@ -94,6 +99,7 @@ set(QTERM_MOC_SRC
     src/qterminalapp.h
     src/compose.h
     src/mainwindow.h
+    src/updatecheck.h
     src/tabbar.h
     src/tabwidget.h
     src/termwidget.h
@@ -214,6 +220,7 @@ target_link_libraries(${EXE_NAME}
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Network
     qtermwidget6
     LayerShellQtInterface
 )

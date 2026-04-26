@@ -49,6 +49,7 @@
 #include "bookmarkswidget.h"
 #include "qterminalapp.h"
 #include "dbusaddressable.h"
+#include "updatecheck.h"
 
 #include <LayerShellQt/Shell>
 #include <LayerShellQt/Window>
@@ -162,6 +163,13 @@ MainWindow::MainWindow(TerminalConfig &cfg,
         m_compose->setRawInputMode(false);
         m_compose->focusTerminal();
     }
+
+    auto *uc = new UpdateCheck(this);
+    connect(uc, &UpdateCheck::updateAvailable, this, [](const QString &cur, const QString &latest, const QString &url) {
+        qInfo("nterminal update available: %s → %s  %s",
+              qPrintable(cur), qPrintable(latest), qPrintable(url));
+    });
+    uc->check();
 }
 
 void MainWindow::rebuildActions()
