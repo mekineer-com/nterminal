@@ -25,9 +25,36 @@ In Codex, Gemini, and plain shells, normal drag works.
 
 All three AI CLIs and plain shells are confirmed working for replace, `?` preservation, and submit.
 
-**Gemini CLI:** `?` in submitted text is preserved via a help-menu trick — a leading `?` is sent first to switch Gemini out of command mode, then the actual text follows after 100ms.
+| CLI | Submit | Transfer | Notes |
+|-----|--------|----------|-------|
+| Claude Code | 200ms delays | Bracketed paste | Shift+drag for selection in fullscreen TUI |
+| Codex CLI | 100ms delay | Direct | |
+| Gemini CLI | `?` primer + 100/200ms | `?` primer + 100ms | Preserves literal `?` characters |
+| bash/ash/zsh | 100ms delay | Direct | Uses `\r` not Key_Return to avoid double-Enter |
 
-**Claude Code:** text injection uses bracketed paste mode to avoid unbackspaceable line boundaries in Claude Code's multi-line input widget.
+## Vendored QTermWidget Patches
+
+NTerminal vendors a [patched QTermWidget](https://github.com/mekineer-com/qtermwidget) with fixes that benefit all qtermwidget users (upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638)):
+
+- **Bottom-anchored scroll on resize:** when the terminal shrinks, the viewport stays put instead of jumping to the top of scrollback. Stock qtermwidget/qterminal has this bug.
+- **Suppress pty resize API:** `setSuppressPtyResize(bool)` lets the host app prevent SIGWINCH during internal layout changes (compose editor, search bar). Without this, TUI apps redraw on every resize, duplicating history.
+
+## Architecture
+
+All compose logic lives in `src/compose.cpp` / `src/compose.h`. `mainwindow.cpp` stays close to upstream qterminal with ~50 lines of wiring.
+
+| File | Purpose |
+|------|---------|
+| `src/compose.cpp` | Compose editor, CLI detection, submit/transfer, clear |
+| `src/compose.h` | ComposeInput class |
+| `src/updatecheck.cpp` | GitHub release update checker |
+| `lib/qtermwidget/` | Vendored patched QTermWidget (git submodule) |
+
+## Other Features
+
+- **Double-submit guard:** rapid Ctrl+Enter presses won't send twice.
+- **Unlimited scrollback** in compose mode — useful for Codex and Gemini sessions.
+- **Update checker:** checks GitHub releases on startup, logs a notice if outdated.
 
 ---
 

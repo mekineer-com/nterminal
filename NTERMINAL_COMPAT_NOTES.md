@@ -1,138 +1,84 @@
-# NTerminal Compatibility And Handoff Coverage
+# NTerminal Compatibility Notes
 
-Last updated: 2026-04-18
+Last updated: 2026-04-26
 
-## Sources Covered
-- `/home/marcos/gemini-cli/HANDOFF.md`
-- `/home/marcos/gemini-cli/_archive/doc-versions/HANDOFF-260411-squash-071428.md`
+## Compatibility Matrix
 
-## Legend
-- `W` = works in live test
-- `F` = fails in live test
-- `RT` = re-test needed after latest code change
+| CLI | Replace Prompt | Preserve `?` | Submit | Notes |
+|-----|---------------|-------------|--------|-------|
+| Claude Code | W | W | W | Clear: Ctrl+U. Submit: 200ms delays. Transfer: bracketed paste. |
+| Codex CLI | W | W | W | Clear: Ctrl+K + Ctrl+U ×8. Submit: Enter key after 100ms. |
+| Gemini CLI | W | W | W | Clear: Down×8 + Ctrl+E + Ctrl+U×8. `?` primer trick on both paths. |
+| bash/ash/zsh | W | W | W | Clear: Ctrl+K + Ctrl+U ×8. Submit: `\r` after 100ms (not Key_Return). |
 
-## Current Compatibility Matrix (Versions As Rows)
+## Architecture
 
-| CLI Version | Replace Prompt From Editor | Preserve `?` In Text | `Ctrl+Enter` Submits Message | Notes |
-|---|---|---|---|---|
-| Claude Code `2.1.112` | W | W | W | Clear: single Ctrl+U. Inject: 100ms delay + bracketed paste. Submit: raw `\r` after 100ms. |
-| Codex CLI `0.118.0` | W | W | W | Uses shared fallback clear path (`Ctrl+K` x8, `Ctrl+U` x8). Enter-key submit after 100ms. |
-| Gemini CLI `0.38.1` | W | W | W | Clear: Ctrl+E + Ctrl+U x8. Both transfer and submit paths: send `?` immediately (triggers help menu, puts Gemini in editing mode), 100ms delay, then text. Submit: raw `\r` after 200ms. `?` in text preserved because Gemini treats `?` as literal in editing mode. |
+All compose logic in `src/compose.cpp` / `src/compose.h`. `mainwindow.cpp` has ~50 lines of wiring.
 
-Marcos notes: claude and codex never had issues with the question mark: only gemini.
+CLI detection: reads `/proc/<pid>/cmdline` for foreground and shell processes. Matches "claude", "codex", "gemini". Falls back to Unknown (bash/zsh path).
 
-## Behavior And Feature Coverage (From Handoffs)
+## Submit Timing
 
-### Method Policy (Do Not Drift)
-- Use one unified method per function first (for example: one submit path for all CLIs).
-- Split into CLI-specific methods only when the unified method is proven failing in live tests.
-- Every approved CLI-specific split must be recorded in the compatibility table row and notes.
-- Treat the compatibility table as source of truth for exceptions; do not add hidden per-CLI behavior outside what the table documents.
+| CLI | Step 1 | Wait | Step 2 | Wait | Step 3 |
+|-----|--------|------|--------|------|--------|
+| Claude | Ctrl+U | 200ms | text | 200ms | `\r` |
+| Gemini | `?` | 100ms | text | 200ms | `\r` |
+| Codex | text | 100ms | Key_Return | — | — |
+| Unknown | text | 100ms | `\r` | — | — |
 
-### Active Behavior
-- Compose mode integrated in forked terminal (`nterminal`) with editor strip in-terminal.
-- `Ctrl+Enter` sends composed content with CLI-specific delayed submit timing.
-- Submit timing by CLI:
-  - Claude: 100ms after clear before insert, then raw `\r` 100ms after insert.
-  - Gemini: raw `\r` after 300ms (user-confirmed).
-  - Codex: Enter key event after 100ms.
-  - Unknown: Enter key event after 100ms.
-- Submit path uses Enter keypress+release by default, with Claude and Gemini using raw `\r`.
-- `F6` toggles compose/raw mode.
-- Startup focus: compose panel is visible, but focus starts on terminal input.
-- Bidirectional transfer shortcuts:
-  - `Ctrl+Shift+Down`: terminal selection -> compose editor.
-  - `Ctrl+Shift+Up`: compose editor -> terminal input.
-- Terminal input is cleared best-effort before compose text is injected.
-- Compose transfer normalization removes selection artifacts (trailing whitespace + soft-wrap indent cleanup).
-- CLI-aware handling exists in `src/mainwindow.cpp`:
-  - Claude has independent clear and submit paths.
-  - Gemini has independent clear and submit paths.
-  - Codex has independent clear and submit paths.
-  - Unknown CLI has explicit fallback clear and submit paths.
-  - Claude and Gemini submit use raw `\r`; Codex/Unknown submit paths use Enter key event.
+Double-submit guard (`m_submitInProgress`) prevents Ctrl+Enter race across all CLIs.
 
-### Supporting Files And Paths
-- Repo: `/home/marcos/gemini-cli/nterminal`
-- Launcher: `/home/marcos/.local/bin/nterminal`
-- Desktop entry: `/home/marcos/.local/share/applications/nterminal.desktop`
-- Built binary artifact path: `/home/marcos/gemini-cli/nterminal/build/qterminal`
-- Main implementation files:
-  - `src/mainwindow.h`
-  - `src/mainwindow.cpp`
+## Vendored QTermWidget Patches
 
-### Documented Commits Mentioned In Handoffs
-- `762b4b6`:
-  - added compose input mode and stabilized `Ctrl+Enter` submit with delayed Enter (`100ms`).
-- `bd845c0`:
-  - compose/terminal transfer shortcuts and robust overwrite/selection cleanup.
-- `c28feed`:
-  - README shortcut and intro updates.
+Submodule at `lib/qtermwidget/` → [mekineer-com/qtermwidget](https://github.com/mekineer-com/qtermwidget).
+Upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638).
 
-### Historical Attempts Noted (Important Context)
-- Tried direct keypress submit (press/release Enter) for Codex in an earlier stage.
-- Tried raw `\r` submit path at short delay; bad for Gemini in that form. Gemini raw `\r` at 300ms is user-confirmed working.
-- Tried duplicate/newline mitigation paths:
-  - shortcut duplication cleanup,
-  - event-filter interception for `Ctrl+Enter`,
-  - later rollback to pre-interceptor path on request.
-- Delay tuning happened (`200ms` -> `100ms`).
-- `?` drop/preservation issue was investigated; Gemini remains an active regression watch item.
+### Bottom-anchored scroll (Screen.cpp, ScreenWindow.cpp, Emulation.cpp)
+`Screen::resizeImage()` pushes lines to history when terminal shrinks, but `ScreenWindow::_currentLine` wasn't adjusted in the non-tracking path → viewport jumped to top. Fix: `_resizePushedLines` counter, accumulated across batched resizes, reset in `showBulk()`.
 
-### Repo/Distribution History
-- Fork repo created and wired:
-  - `https://github.com/mekineer-com/nterminal`
-  - `origin` set to fork remote.
-- Fork visibility switched to public.
-- Local backup artifacts were created during launcher/desktop rewiring:
-  - `/home/marcos/.local/bin/nterminal.orig`
-  - `/home/marcos/.local/share/applications/nterminal.desktop.orig`
+### Suppress pty resize API (Session.h, qtermwidget.h)
+`setSuppressPtyResize(bool)` skips `setWindowSize()` (TIOCSWINSZ/SIGWINCH) while set. Used by nterminal during compose resize and Ctrl+F search bar toggle. Without this, TUI apps receive SIGWINCH and redraw, duplicating history content.
 
-## Bidirectional Transfer (Ctrl+Shift+Down / Ctrl+Shift+Up)
+### CMAKE_CURRENT_BINARY_DIR fix (CMakeLists.txt)
+Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when built as `add_subdirectory()`. Changed to `CMAKE_CURRENT_BINARY_DIR`.
 
-### Ctrl+Shift+Down (terminal → compose) and Ctrl+Shift+C (copy)
+## Compose Editor Details
 
-**In Claude Code tui:fullscreen, use Shift+drag to select text.** Both Ctrl+Shift+Down and Ctrl+Shift+C work with Shift+drag. Plain drag appears to highlight (blue) but the highlight is visual-only — no real selection is produced, so Ctrl+Shift+Down returns stale cache content and Ctrl+Shift+C copies nothing.
+- `documentMargin(2)` for left/right padding (prevents first-character clipping).
+- Unlimited scrollback history in compose mode (benefits Codex/Gemini long sessions; Claude Code clears its own scrollback).
+- Height auto-grows up to `NTERMINAL_COMPOSE_MAX_LINES` (default 12).
+- `QTimer::singleShot(0)` deferred height update so document layout runs before size query.
 
-**Root cause** (verified against qtermwidget 2.3.0 source, Screen.cpp):
-- Claude Code does NOT enable mouse reporting (no `?1000h`/`?1002h`/`?1006h` etc. in cli.js — `_mouseMarks=true` stays at default, so selection logic is wired correctly)
-- But Claude's alt-screen repaints constantly call `Screen::clearSelection()` (lines 984, 1082) when terminal output overlaps the selection region
-- User drags to select → selection created → Claude repaints → `clearSelection()` wipes it → on mouse release, `setSelection()` writes empty string to X11 PRIMARY
-- The "blue highlight" is `_iPntSel`/`_pntSel` visual drag feedback in TerminalDisplay, independent of Screen's selection state — it renders while dragging but doesn't survive release
+## Selection and Transfer
 
-**Why Shift+drag works**: same code path for `_mouseMarks=true`, but the drag-to-release flow happens to survive the repaint race in practice. Exact reason unclear without more QTermWidget reading.
+### Terminal → Editor (Ctrl+Shift+Down)
+1. Try `selectedText(true)` (live selection)
+2. Fall back to `lastSelectedText()` cache
+3. Normalize: strip `\r`, trailing whitespace, soft-wrap indent artifacts
+4. Insert at cursor (not replace)
+5. Clear cache after transfer
 
-**Why not fix**: fix requires patching qtermwidget (skip `clearSelection()` during active drag, `_actSel==2`) and vendoring the patched library. ~2-3 hours work plus ongoing maintenance. Shift+drag workaround accepted as the cost.
+Cache populated via `copyAvailable(true)` and X11 PRIMARY `selectionChanged` (focus-gated to prevent leaks from other apps).
 
-**Claude's "ctrl+c to copy" message**: Claude shows this based on its own UI heuristics, not because it detects the selection (it can't — no mouse reporting). Misleading but unrelated.
+### Editor → Terminal (Ctrl+Shift+Up)
+- Claude: 100ms delay + bracketed paste (`\x1b[200~`...`\x1b[201~`)
+- Gemini: `?` primer + 100ms + text
+- Others: direct `sendText`
 
-**Plain drag still works** in: plain shells, Codex, Gemini (none of them repaint alt-screen aggressively enough to race with selection).
+### Claude Code selection quirk
+In `tui: fullscreen`, plain drag creates visual highlight but Screen repaints clear it before release. **Shift+drag** works. See upstream root cause: `Screen::clearSelection()` during alt-screen repaints.
 
-**Cache paths implemented** (both still useful for other CLIs): `TermWidget::m_lastSelectedText` populated from `copyAvailable(true)` and `QClipboard::selectionChanged` (X11 PRIMARY).
+## Known Limitations
 
-### Scrollbar in Claude Code — not an nterminal bug
-- `tui: fullscreen` (active since 2026-04-17) puts Claude in alt-screen mode. Alt-screen has no scrollback buffer; QTermWidget shows no scrollbar thumb because there is nothing to scroll.
-- Scrollbar works correctly in plain shell sessions.
-- No fix possible in nterminal without reverting `tui: fullscreen` in `~/.claude/settings.json`.
+- **Window resize** (user drags edge): SIGWINCH fires normally → TUI app redraws → possible history duplication. Rare and intentional; not suppressed.
+- **Claude Code scrollback**: Claude clears its own scrollback (ESC[3J). Unlimited history in nterminal doesn't help Claude specifically. Benefits Codex and Gemini.
+- **Gemini `?` timing**: 100ms delay between primer and text is empirical. May need adjustment on slower systems.
 
-## Critical Implementation Notes (for AI agents)
+## Build
 
-**Build:** `cmake --build /home/marcos/gemini-cli/nterminal/build -j2`. Always confirm clean compile before committing.
+```
+git clone --recurse-submodules https://github.com/mekineer-com/nterminal.git
+cd nterminal && mkdir build && cd build && cmake .. && make -j$(nproc)
+```
 
-**`sendCtrlKey` sends nothing to pty.** Passes empty text to `QKeyEvent`; QTermWidget reads `event->text()` to decide what bytes to write. Fix: use `impl->sendText("\xNN")` with actual control bytes. Codex/Gemini clear paths also use `sendCtrlKey` and are reported working — the empty-text issue may be masked by those CLIs using readline at the tty level.
-
-**Ctrl+U and Ctrl+K ARE supported by Claude Code's input handler** (user-confirmed via manual keypress). The historical "hard block" was not from Ctrl+U/K being broken — it was caused by injecting raw `\n` characters which created line boundaries in Claude Code's multi-line input widget. Ctrl+U can only kill to start of the *current* line, not across `\n`-created boundaries. Fixed by bracketed paste on inject.
-
-**Claude clear path** (`clearTerminalInputBestEffort`): single `\x15` (Ctrl+U) — confirmed full clear regardless of cursor position in Claude Code.
-
-**Gemini `?` handling:** Gemini treats `?` as a command trigger when input buffer is empty (shows help menu, consumes the `?`). Fix: send `?` immediately after clear to fire the help menu, 100ms delay, then send text. After help menu fires, Gemini is in editing mode and all `?` in text are literal. Applies to both `transferComposeToTerminal` and `sendComposeToTerminal`. Node.js buffers stdin so delays between `?` and text are unreliable — the 100ms is just enough for the help menu to render.
-
-**Claude Code `tui: fullscreen`** (set in `~/.claude/settings.json`): ink/React with mouse reporting. Plain drag goes to the app — `copyAvailable` never fires. **Shift+drag** forces terminal-level selection and sets X11 PRIMARY.
-
-**Claude inject path** (`transferComposeToTerminal`): 100 ms delay after clear + bracketed paste wrap (`\x1b[200~`...`\x1b[201~`) so Claude Code treats `\n` as literal newline, not a line-boundary that blocks backspace.
-
-## Outlier Note
-- Current outliers:
-  - Claude clear/replace and `?`: **working**.
-  - Gemini `?` preservation: **working** (2026-04-18). Gemini clear: RT.
-  - Ctrl+Shift+Down in Claude Code: requires Shift+drag (not plain drag) due to app mouse reporting. See section above.
+Launcher: set `NTERMINAL_COMPOSE=1` to enable compose mode.
