@@ -396,16 +396,20 @@ void ComposeInput::send()
     }
     else if (cli == Cli::Gemini)
     {
-        // Leading '?' fires the help menu so text is treated as literal (dc11ca6).
-        impl->sendText(QStringLiteral("?"));
-        QTimer::singleShot(100, this, [this, text, findImpl, finish]() {
+        // 200ms for clear to settle, then '?' fires help menu (dc11ca6).
+        QTimer::singleShot(200, this, [this, text, findImpl, finish]() {
             TermWidgetImpl *i = findImpl();
             if (i == nullptr) { finish(); return; }
-            i->sendText(text);
-            QTimer::singleShot(200, this, [this, findImpl, finish]() {
+            i->sendText(QStringLiteral("?"));
+            QTimer::singleShot(100, this, [this, text, findImpl, finish]() {
                 TermWidgetImpl *i2 = findImpl();
-                if (i2 != nullptr) i2->sendText(QString(QLatin1Char('\r')));
-                finish();
+                if (i2 == nullptr) { finish(); return; }
+                i2->sendText(text);
+                QTimer::singleShot(200, this, [this, findImpl, finish]() {
+                    TermWidgetImpl *i3 = findImpl();
+                    if (i3 != nullptr) i3->sendText(QString(QLatin1Char('\r')));
+                    finish();
+                });
             });
         });
     }
