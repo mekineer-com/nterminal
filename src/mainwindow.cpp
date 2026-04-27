@@ -28,9 +28,6 @@
 #include <QActionGroup>
 #include <QGridLayout>
 #include <QShortcut>
-#include <QFrame>
-#include <QKeyEvent>
-#include <QMouseEvent>
 #include <QFile>
 
 #ifdef HAVE_QDBUS
@@ -162,9 +159,7 @@ MainWindow::MainWindow(TerminalConfig &cfg,
     {
         m_compose->setRawInputMode(false);
         m_compose->focusTerminal();
-        // Permanently suppress pty resize for internal layout changes.
-        // Deferred so the initial layout (including compose editor
-        // visibility) settles and the pty learns the correct size first.
+        // Deferred: initial layout must settle before suppress activates.
         QTimer::singleShot(200, this, [this]() {
             if (TermWidgetImpl *impl = m_compose->currentImpl())
                 impl->setSuppressPtyResize(true);

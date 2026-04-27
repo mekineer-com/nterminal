@@ -4,7 +4,6 @@
 #include <QObject>
 
 class QPlainTextEdit;
-class QAction;
 class QGridLayout;
 class QWidget;
 class QEvent;
@@ -43,7 +42,6 @@ private:
 
     TabWidget *m_tabulator;
     QPlainTextEdit *m_editor = nullptr;
-    QAction *m_toggleAction = nullptr;
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;

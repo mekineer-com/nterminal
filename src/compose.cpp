@@ -1,7 +1,6 @@
 #include "compose.h"
 
 #include <QPlainTextEdit>
-#include <QAction>
 #include <QGridLayout>
 #include <QShortcut>
 #include <QTimer>
