@@ -162,6 +162,13 @@ MainWindow::MainWindow(TerminalConfig &cfg,
     {
         m_compose->setRawInputMode(false);
         m_compose->focusTerminal();
+        // Permanently suppress pty resize for internal layout changes.
+        // Deferred so the initial layout (including compose editor
+        // visibility) settles and the pty learns the correct size first.
+        QTimer::singleShot(200, this, [this]() {
+            if (TermWidgetImpl *impl = m_compose->currentImpl())
+                impl->setSuppressPtyResize(true);
+        });
     }
 
     auto *uc = new UpdateCheck(this);
@@ -898,19 +905,7 @@ void MainWindow::setKeepOpen(bool value)
 
 void MainWindow::find()
 {
-    TermWidgetImpl *impl = consoleTabulator->terminalHolder()->currentTerminal()->impl();
-    if (m_compose != nullptr && m_compose->isActive())
-        impl->setSuppressPtyResize(true);
-
-    impl->toggleShowSearchBar();
-
-    if (m_compose != nullptr && m_compose->isActive())
-    {
-        QTimer::singleShot(0, this, [this]() {
-            if (TermWidgetImpl *i = m_compose->currentImpl())
-                i->setSuppressPtyResize(false);
-        });
-    }
+    consoleTabulator->terminalHolder()->currentTerminal()->impl()->toggleShowSearchBar();
 }
 
 void MainWindow::handleHistory()
@@ -986,6 +981,22 @@ bool MainWindow::event(QEvent *event)
     }
 
     return QMainWindow::event(event);
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    if (m_compose != nullptr && m_compose->isActive())
+    {
+        QTimer::singleShot(0, this, [this]() {
+            if (TermWidgetImpl *impl = m_compose->currentImpl())
+            {
+                impl->setSuppressPtyResize(false);
+                impl->sendCurrentSizeToPty();
+                impl->setSuppressPtyResize(true);
+            }
+        });
+    }
 }
 
 void MainWindow::showEvent(QShowEvent* event)

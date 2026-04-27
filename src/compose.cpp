@@ -89,7 +89,6 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
 
     updateHeight();
     setRawInputMode(false);
-    m_heightInitialized = true;
 }
 
 TermWidgetImpl *ComposeInput::currentImpl()
@@ -129,26 +128,7 @@ void ComposeInput::updateHeight()
     const int frame = m_editor->frameWidth() * 2;
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
-    if (m_heightInitialized)
-    {
-        if (TermWidgetImpl *impl = currentImpl())
-            impl->setSuppressPtyResize(true);
-    }
-
     m_editor->setFixedHeight(newHeight);
-
-    if (m_heightInitialized && visualLines == 1)
-    {
-        // Compose returned to 1 line (submit/clear). Unsuppress and tell
-        // the pty the correct size so the app renders correctly.
-        QTimer::singleShot(50, this, [this]() {
-            if (TermWidgetImpl *impl = currentImpl())
-            {
-                impl->setSuppressPtyResize(false);
-                impl->sendCurrentSizeToPty();
-            }
-        });
-    }
 }
 
 void ComposeInput::focusTerminal()
