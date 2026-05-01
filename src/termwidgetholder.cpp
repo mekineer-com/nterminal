@@ -180,7 +180,7 @@ static void normalizeToRight(NavigationData *point, NavigationDirection dir) {
             transposeTransform(point);
             break;
         default:
-            assert("Invalid navigation");
+            assert(false && "Invalid navigation");
             return;
     }
 }
@@ -198,6 +198,10 @@ static NavigationData getNormalizedDimensions(QWidget *w, NavigationDirection di
 void TermWidgetHolder::directionalNavigation(NavigationDirection dir) {
     // Find an active widget
     QList<TermWidget*> l = findChildren<TermWidget*>();
+    if (l.isEmpty())
+    {
+        return;
+    }
     int ix = -1;
     for (TermWidget * w : std::as_const(l))
     {
@@ -207,7 +211,7 @@ void TermWidgetHolder::directionalNavigation(NavigationDirection dir) {
             break;
         }
     }
-    if (ix > l.count())
+    if (ix < 0 || ix >= l.count())
     {
         l.at(0)->impl()->setFocus(Qt::OtherFocusReason);
         return;
@@ -256,7 +260,11 @@ void TermWidgetHolder::directionalNavigation(NavigationDirection dir) {
 
 void TermWidgetHolder::clearActiveTerminal()
 {
-    currentTerminal()->impl()->clear();
+    if (auto *term = currentTerminal())
+    {
+        if (auto *impl = term->impl())
+            impl->clear();
+    }
 }
 
 void TermWidgetHolder::propertiesChanged()
@@ -280,8 +288,19 @@ void TermWidgetHolder::splitVertical(TermWidget * term)
 
 void TermWidgetHolder::splitCollapse(TermWidget * term)
 {
+    if (term == nullptr)
+    {
+        return;
+    }
+
     QSplitter * parent = qobject_cast<QSplitter*>(term->parent());
     assert(parent);
+    if (parent == nullptr)
+        return;
+    if (m_currentTerm == term)
+    {
+        m_currentTerm = nullptr;
+    }
     term->setParent(nullptr);
     delete term;
 
@@ -313,13 +332,21 @@ void TermWidgetHolder::splitCollapse(TermWidget * term)
 
     if (parent->count() > 0)
     {
-        if (nextFocus)
+        QWidget *focusTarget = nextFocus != Q_NULLPTR ? nextFocus : parent->widget(0);
+        if (focusTarget != Q_NULLPTR)
         {
-            nextFocus->setFocus(Qt::OtherFocusReason);
-        }
-        else
-        {
-            parent->widget(0)->setFocus(Qt::OtherFocusReason);
+            focusTarget->setFocus(Qt::OtherFocusReason);
+            if (m_currentTerm == nullptr)
+            {
+                if (auto *targetTerm = qobject_cast<TermWidget*>(focusTarget))
+                {
+                    m_currentTerm = targetTerm;
+                }
+                else
+                {
+                    m_currentTerm = focusTarget->findChild<TermWidget*>();
+                }
+            }
         }
         parent->update();
     }
@@ -329,8 +356,13 @@ void TermWidgetHolder::splitCollapse(TermWidget * term)
 
 TermWidget * TermWidgetHolder::split(TermWidget *term, Qt::Orientation orientation, TerminalConfig cfg)
 {
+    if (term == nullptr)
+        return nullptr;
+
     QSplitter *parent = qobject_cast<QSplitter *>(term->parent());
     assert(parent);
+    if (parent == nullptr)
+        return nullptr;
 
     int ix = parent->indexOf(term);
     QList<int> parentSizes = parent->sizes();
@@ -397,7 +429,7 @@ void TermWidgetHolder::handle_finished()
     TermWidget * w = qobject_cast<TermWidget*>(sender());
     if (w == nullptr)
     {
-        qFatal("TermWidgetHolder::handle_finished: Unknown object to handle");
+        return;
     }
     splitCollapse(w);
 }
@@ -461,4 +493,3 @@ void TermWidgetHolder::closeTab()
 }
 
 #endif
-

@@ -159,11 +159,6 @@ MainWindow::MainWindow(TerminalConfig &cfg,
     {
         m_compose->setRawInputMode(false);
         m_compose->focusTerminal();
-        // Deferred: initial layout must settle before suppress activates.
-        QTimer::singleShot(200, this, [this]() {
-            if (TermWidgetImpl *impl = m_compose->currentImpl())
-                impl->setSuppressPtyResize(true);
-        });
     }
 
     auto *uc = new UpdateCheck(this);
@@ -706,14 +701,17 @@ bool MainWindow::closePrompt(const QString &title, const QString &text)
 
 void MainWindow::closeEvent(QCloseEvent *ev)
 {
-    if (!Properties::Instance()->askOnExit
-        || consoleTabulator->count() == 0
-        // the session is ended explicitly (e.g., by ctrl-d); prompt doesn't make sense
-        || consoleTabulator->terminalHolder()->findChildren<TermWidget*>().count() == 0
-        // there is no running process
-        || !consoleTabulator->hasRunningProcess()
-        // ask user for canceling otherwise
-        || closePrompt(tr("Exit QTerminal"), tr("Are you sure you want to exit?")))
+    bool shouldClose = true;
+    if (Properties::Instance()->askOnExit && consoleTabulator->count() > 0)
+    {
+        const auto *holder = consoleTabulator->terminalHolder();
+        const bool hasTerminals = holder != nullptr && holder->findChildren<TermWidget*>().count() > 0;
+        const bool hasRunningProcess = hasTerminals && consoleTabulator->hasRunningProcess();
+        if (hasRunningProcess)
+            shouldClose = closePrompt(tr("Exit QTerminal"), tr("Are you sure you want to exit?"));
+    }
+
+    if (shouldClose)
     {
         disconnect(m_bookmarksDock, &QDockWidget::visibilityChanged,
                    this, &MainWindow::bookmarksDock_visibilityChanged); // prevent crash
@@ -900,7 +898,14 @@ void MainWindow::setKeepOpen(bool value)
 
 void MainWindow::find()
 {
-    consoleTabulator->terminalHolder()->currentTerminal()->impl()->toggleShowSearchBar();
+    if (auto *holder = consoleTabulator->terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->toggleShowSearchBar();
+        }
+    }
 }
 
 void MainWindow::handleHistory()
@@ -913,7 +918,17 @@ void MainWindow::handleHistory()
         qDebug() << "Failed to open" << file.fileName() << "for writing";
         return;
     }
-    TermWidgetImpl *impl = consoleTabulator->terminalHolder()->currentTerminal()->impl();
+    TermWidgetImpl *impl = nullptr;
+    if (auto *holder = consoleTabulator->terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+            impl = term->impl();
+    }
+    if (impl == nullptr)
+    {
+        file.close();
+        return;
+    }
     impl->saveHistory(&file);
     file.close();
     QStringList args = Properties::Instance()->handleHistoryCommand.split(QLatin1Char(' '), Qt::SkipEmptyParts);
@@ -981,17 +996,6 @@ bool MainWindow::event(QEvent *event)
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    if (m_compose != nullptr && m_compose->isActive())
-    {
-        QTimer::singleShot(0, this, [this]() {
-            if (TermWidgetImpl *impl = m_compose->currentImpl())
-            {
-                impl->setSuppressPtyResize(false);
-                impl->sendCurrentSizeToPty();
-                impl->setSuppressPtyResize(true);
-            }
-        });
-    }
 }
 
 void MainWindow::showEvent(QShowEvent* event)
@@ -1010,7 +1014,7 @@ void MainWindow::newTerminalWindow()
 {
     TerminalConfig cfg;
     TermWidgetHolder *ch = consoleTabulator->terminalHolder();
-    if (ch)
+    if (ch && ch->currentTerminal() && ch->currentTerminal()->impl())
         cfg.provideCurrentDirectory(ch->currentTerminal()->impl()->workingDirectory());
 
     if (m_dropMode)
@@ -1037,20 +1041,29 @@ void MainWindow::bookmarksWidget_callCommand(const QString& cmd)
     {
         activateWindow();
     }
-    consoleTabulator->terminalHolder()->currentTerminal()->impl()->sendText(cmd);
-    // the focus proxy (TermWidgetImpl) should be checked because it's nullptr with "exit"
-    if (consoleTabulator->terminalHolder()->currentTerminal()->focusProxy() != nullptr) {
-        consoleTabulator->terminalHolder()->currentTerminal()->setFocus();
+    if (auto *holder = consoleTabulator->terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->sendText(cmd);
+            // the focus proxy (TermWidgetImpl) should be checked because it's nullptr with "exit"
+            if (term->focusProxy() != nullptr)
+                term->setFocus();
+        }
     }
 }
 
 void MainWindow::bookmarksDock_visibilityChanged(bool visible)
 {
     Properties::Instance()->bookmarksVisible = visible;
-    if (!visible && consoleTabulator->terminalHolder()
-        && consoleTabulator->terminalHolder()->currentTerminal()->focusProxy() != nullptr)
+    if (!visible)
     { // this is especially needed in the drop-down mode
-        consoleTabulator->terminalHolder()->currentTerminal()->setFocus();
+        if (auto *holder = consoleTabulator->terminalHolder())
+        {
+            if (auto *term = holder->currentTerminal(); term && term->focusProxy() != nullptr)
+                term->setFocus();
+        }
     }
 }
 
@@ -1094,7 +1107,9 @@ bool MainWindow::hasMultipleTabs(QAction *)
 
 bool MainWindow::hasMultipleSubterminals(QAction *)
 {
-    return consoleTabulator->terminalHolder()->findChildren<TermWidget*>().count() > 1;
+    if (auto *holder = consoleTabulator->terminalHolder())
+        return holder->findChildren<TermWidget*>().count() > 1;
+    return false;
 }
 
 bool MainWindow::hasIndexedTab(QAction *action)

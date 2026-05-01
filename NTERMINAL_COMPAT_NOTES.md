@@ -1,6 +1,26 @@
 # NTerminal Compatibility Notes
 
-Last updated: 2026-04-26
+Last updated: 2026-05-01
+
+## What NTerminal Adds
+
+Fork of qterminal with a compose editor for AI CLIs (Claude Code, Codex, Gemini).
+
+**Compose mode** (`NTERMINAL_COMPOSE=1`):
+- Multi-line text editor below the terminal. Enter adds newlines; Ctrl+Enter sends.
+- Auto-detects which CLI is running and adapts submit/clear behavior per CLI.
+- F6 toggles raw input mode (bypasses editor, types directly into terminal).
+
+**Keyboard shortcuts** (compose mode):
+- **Ctrl+Enter** — send editor contents to terminal
+- **Ctrl+Shift+Down** — grab highlighted terminal text into editor (or just focus editor if nothing selected)
+- **Ctrl+Shift+Up** — transfer editor contents into terminal input without submitting
+- **F6** — toggle raw input mode
+
+**Terminal improvements**:
+- Unlimited scrollback history (benefits Codex and Gemini; Claude Code clears its own).
+- Debounced resize — layout changes from the compose editor produce one clean terminal redraw instead of many.
+- Bottom-anchored scroll — terminal stays at bottom when shrinking (upstream PR: lxqt/qtermwidget#638).
 
 ## Compatibility Matrix
 
@@ -36,8 +56,11 @@ Upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638
 ### Bottom-anchored scroll (Screen.cpp, ScreenWindow.cpp, Emulation.cpp)
 `Screen::resizeImage()` pushes lines to history when terminal shrinks, but `ScreenWindow::_currentLine` wasn't adjusted in the non-tracking path → viewport jumped to top. Fix: `_resizePushedLines` counter, accumulated across batched resizes, reset in `showBulk()`.
 
-### Suppress pty resize API (Session.h, qtermwidget.h)
-`setSuppressPtyResize(bool)` skips `setWindowSize()` (TIOCSWINSZ/SIGWINCH) while set. Used by nterminal during compose resize and Ctrl+F search bar toggle. Without this, TUI apps receive SIGWINCH and redraw, duplicating history content.
+### Debounced resize (Session.cpp)
+`Session::onViewSizeChange()` debounces `updateTerminalSize()` through a 150ms single-shot timer. Compose editor height changes and search bar toggling trigger many rapid layout events; the debounce coalesces them into one SIGWINCH at the correct final size. Replaced earlier suppress approach (`setSuppressPtyResize`) which caused status line disappearing and cursor OOB crashes without fixing the duplication.
+
+### Cursor position clamping (TerminalDisplay.cpp)
+`cursorPosition()` clamps Y to `_lines-1` and X to `_columns-1`. Safety net for transient size mismatches during resize debounce window. `updateImage()` also early-returns if windowLines/windowColumns are zero.
 
 ### CMAKE_CURRENT_BINARY_DIR fix (CMakeLists.txt)
 Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when built as `add_subdirectory()`. Changed to `CMAKE_CURRENT_BINARY_DIR`.
@@ -53,12 +76,11 @@ Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when buil
 
 ### Terminal → Editor (Ctrl+Shift+Down)
 1. Try `selectedText(true)` (live selection)
-2. Fall back to `lastSelectedText()` cache
+2. If empty: just focus the editor (no transfer)
 3. Normalize: strip `\r`, trailing whitespace, soft-wrap indent artifacts
 4. Insert at cursor (not replace)
-5. Clear cache after transfer
 
-Cache populated via `copyAvailable(true)` and X11 PRIMARY `selectionChanged` (focus-gated to prevent leaks from other apps).
+No fallback cache — `lastSelectedText` was removed (caused ghost paste from stale selections).
 
 ### Editor → Terminal (Ctrl+Shift+Up)
 - Claude: 100ms delay + bracketed paste (`\x1b[200~`...`\x1b[201~`)
@@ -70,7 +92,7 @@ In `tui: fullscreen`, plain drag creates visual highlight but Screen repaints cl
 
 ## Known Limitations
 
-- **Window resize** (user drags edge): SIGWINCH fires normally → TUI app redraws → possible history duplication. Rare and intentional; not suppressed.
+- **Window resize** (user drags edge): debounced to one SIGWINCH after layout settles. TUI app still redraws once; history duplication possible but reduced vs pre-debounce.
 - **Claude Code scrollback**: Claude clears its own scrollback (ESC[3J). Unlimited history in nterminal doesn't help Claude specifically. Benefits Codex and Gemini.
 - **Gemini `?` timing**: 100ms delay between primer and text is empirical. May need adjustment on slower systems.
 

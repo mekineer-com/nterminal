@@ -264,17 +264,6 @@ void ComposeInput::clearTerminalInput(TermWidgetImpl *impl)
         return;
     }
 
-    if (cli == Cli::Codex)
-    {
-        constexpr int kPasses = 8;
-        for (int i = 0; i < kPasses; ++i)
-        {
-            sendCtrlKey(impl, Qt::Key_K);
-            sendCtrlKey(impl, Qt::Key_U);
-        }
-        return;
-    }
-
     constexpr int kPasses = 8;
     for (int i = 0; i < kPasses; ++i)
     {
@@ -508,10 +497,6 @@ void ComposeInput::transferFromTerminal()
     if (impl == nullptr) return;
 
     QString source = impl->selectedText(true);
-    if (source.isEmpty())
-    {
-        source = term->lastSelectedText();
-    }
 
     const QString normalized = normalizeSelection(source);
     if (normalized.isEmpty())
@@ -524,5 +509,4 @@ void ComposeInput::transferFromTerminal()
     m_editor->setFocus(Qt::OtherFocusReason);
     m_editor->insertPlainText(normalized);
     updateHeight();
-    term->clearLastSelectedText();
 }

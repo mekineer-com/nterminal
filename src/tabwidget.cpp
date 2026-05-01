@@ -75,7 +75,7 @@ TabWidget::~TabWidget()
 
 TermWidgetHolder * TabWidget::terminalHolder()
 {
-    return reinterpret_cast<TermWidgetHolder*>(widget(currentIndex()));
+    return qobject_cast<TermWidgetHolder*>(widget(currentIndex()));
 }
 
 
@@ -85,7 +85,7 @@ int TabWidget::addNewTab(TerminalConfig config)
     QString label = QString(tr("Shell No. %1")).arg(tabNumerator);
 
     TermWidgetHolder *ch = terminalHolder();
-    if (ch)
+    if (ch && ch->currentTerminal() && ch->currentTerminal()->impl())
         config.provideCurrentDirectory(ch->currentTerminal()->impl()->workingDirectory());
 
     TermWidgetHolder *console = new TermWidgetHolder(config, this);
@@ -110,44 +110,63 @@ int TabWidget::addNewTab(TerminalConfig config)
 
 void TabWidget::switchLeftSubterminal()
 {
-    terminalHolder()->directionalNavigation(NavigationDirection::Left);
+    if (auto *holder = terminalHolder())
+        holder->directionalNavigation(NavigationDirection::Left);
 }
 
 void TabWidget::switchRightSubterminal()
 {
-    terminalHolder()->directionalNavigation(NavigationDirection::Right);
+    if (auto *holder = terminalHolder())
+        holder->directionalNavigation(NavigationDirection::Right);
 }
 
 void TabWidget::switchTopSubterminal() {
-    terminalHolder()->directionalNavigation(NavigationDirection::Top);
+    if (auto *holder = terminalHolder())
+        holder->directionalNavigation(NavigationDirection::Top);
 }
 
 void TabWidget::switchBottomSubterminal() {
-    terminalHolder()->directionalNavigation(NavigationDirection::Bottom);
+    if (auto *holder = terminalHolder())
+        holder->directionalNavigation(NavigationDirection::Bottom);
 }
 
 void TabWidget::splitHorizontally()
 {
-    terminalHolder()->splitHorizontal(terminalHolder()->currentTerminal());
-    findParent<MainWindow>(this)->updateDisabledActions();
+    if (auto *holder = terminalHolder())
+    {
+        holder->splitHorizontal(holder->currentTerminal());
+    }
+    if (auto *win = findParent<MainWindow>(this))
+        win->updateDisabledActions();
 }
 
 void TabWidget::splitVertically()
 {
-    terminalHolder()->splitVertical(terminalHolder()->currentTerminal());
-    findParent<MainWindow>(this)->updateDisabledActions();
+    if (auto *holder = terminalHolder())
+    {
+        holder->splitVertical(holder->currentTerminal());
+    }
+    if (auto *win = findParent<MainWindow>(this))
+        win->updateDisabledActions();
 }
 
 void TabWidget::splitCollapse()
 {
     auto win = findParent<MainWindow>(this);
+    auto *holder = terminalHolder();
+    if (holder == nullptr)
+        return;
+
+    auto *term = holder->currentTerminal();
+    auto *impl = term ? term->impl() : nullptr;
+
     if (Properties::Instance()->askOnExit)
     {
-        if (auto impl = terminalHolder()->currentTerminal()->impl())
+        if (impl != nullptr)
         {
             if (impl->hasCommand() || impl->getForegroundProcessId() != impl->getShellPID())
             {
-                if (!win->closePrompt(tr("Close Subterminal"), tr("Are you sure you want to close this subterminal?")))
+                if (win != nullptr && !win->closePrompt(tr("Close Subterminal"), tr("Are you sure you want to close this subterminal?")))
                 {
                     return;
                 }
@@ -155,38 +174,81 @@ void TabWidget::splitCollapse()
         }
     }
 
-    terminalHolder()->splitCollapse(terminalHolder()->currentTerminal());
-    win->updateDisabledActions();
+    holder->splitCollapse(term);
+    if (win != nullptr)
+        win->updateDisabledActions();
 }
 
 void TabWidget::copySelection()
 {
-    terminalHolder()->currentTerminal()->impl()->copyClipboard();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->copyClipboard();
+        }
+    }
 }
 
 void TabWidget::pasteClipboard()
 {
-    terminalHolder()->currentTerminal()->impl()->pasteClipboard();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->pasteClipboard();
+        }
+    }
 }
 
 void TabWidget::pasteSelection()
 {
-    terminalHolder()->currentTerminal()->impl()->pasteSelection();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->pasteSelection();
+        }
+    }
 }
 
 void TabWidget::zoomIn()
 {
-    terminalHolder()->currentTerminal()->impl()->zoomIn();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->zoomIn();
+        }
+    }
 }
 
 void TabWidget::zoomOut()
 {
-    terminalHolder()->currentTerminal()->impl()->zoomOut();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->zoomOut();
+        }
+    }
 }
 
 void TabWidget::zoomReset()
 {
-    terminalHolder()->currentTerminal()->impl()->zoomReset();
+    if (auto *holder = terminalHolder())
+    {
+        if (auto *term = holder->currentTerminal())
+        {
+            if (auto *impl = term->impl())
+                impl->zoomReset();
+        }
+    }
 }
 
 void TabWidget::updateTabIndices()
@@ -321,9 +383,11 @@ void TabWidget::contextMenuEvent(QContextMenuEvent *event)
 
 bool TabWidget::eventFilter(QObject *obj, QEvent *event)
 {
-    QMouseEvent *e = reinterpret_cast<QMouseEvent*>(event);
-    if (e->button() == Qt::MiddleButton) {
-        if (event->type() == QEvent::MouseButtonRelease && Properties::Instance()->closeTabOnMiddleClick)
+    Q_UNUSED(obj)
+    if (event->type() == QEvent::MouseButtonRelease)
+    {
+        auto *e = static_cast<QMouseEvent*>(event);
+        if (e->button() == Qt::MiddleButton && Properties::Instance()->closeTabOnMiddleClick)
         {
             // close the tab on middle clicking
             int index = tabBar()->tabAt(e->pos());
@@ -336,6 +400,7 @@ bool TabWidget::eventFilter(QObject *obj, QEvent *event)
     }
     else if (event->type() == QEvent::MouseButtonDblClick)
     {
+        auto *e = static_cast<QMouseEvent*>(event);
         // if user doubleclicks on tab button - rename it. If user
         // clicks on free space - open new tab
         int index = tabBar()->tabAt(e->pos());
@@ -369,21 +434,28 @@ bool TabWidget::eventFilter(QObject *obj, QEvent *event)
 void TabWidget::removeFinished()
 {
     QObject* term = sender();
+    if (term == nullptr)
+        return;
+
     QVariant prop = term->property(TAB_INDEX_PROPERTY);
     if(prop.isValid() && prop.canConvert<int>())
     {
         int index = prop.toInt();
-        removeTab(index);
+        if (index >= 0 && index < count())
+            removeTab(index);
     }
 }
 
 void TabWidget::removeTab(int index, bool prompt)
 {
+    if (index < 0 || index >= count())
+        return;
+
     if (count() > 1)
     {
         if (prompt && Properties::Instance()->askOnExit)
         {
-            if (TermWidgetHolder* term = reinterpret_cast<TermWidgetHolder*>(widget(index)))
+            if (TermWidgetHolder* term = qobject_cast<TermWidgetHolder*>(widget(index)))
             {
                 if (term->hasRunningProcess())
                 {
@@ -406,7 +478,8 @@ void TabWidget::removeTab(int index, bool prompt)
         int current = currentIndex();
         if (current >= 0 )
         {
-            qobject_cast<TermWidgetHolder*>(widget(current))->setInitialFocus();
+            if (auto *holder = qobject_cast<TermWidgetHolder*>(widget(current)))
+                holder->setInitialFocus();
         }
     // do not decrease it as renaming is disabled in renameTabsAfterRemove
     //    tabNumerator--;
@@ -428,16 +501,22 @@ void TabWidget::onAction()
 {
     QObject *action = sender();
     Q_ASSERT(action);
-    switchTab(action->property("tab").toInt() - 1);
+    const int target = action->property("tab").toInt() - 1;
+    if (target >= 0 && target < count())
+        switchTab(target);
 }
 
 void TabWidget::onCurrentChanged(int index)
 {
     // update disabled actions, but only after probable subterminals are added
     QTimer::singleShot(0, this, [this] {
-        findParent<MainWindow>(this)->updateDisabledActions();
+        if (auto *window = findParent<MainWindow>(this))
+            window->updateDisabledActions();
     });
     // also, update history
+    if (index < 0 || index >= count())
+        return;
+
     auto* w = widget(index);
     mHistory.removeAll(w);
     mHistory.prepend(w);
@@ -459,12 +538,16 @@ void TabWidget::removeCurrentTab()
 
 int TabWidget::switchToRight()
 {
+    if (count() == 0)
+        return -1;
     switchTab((currentIndex() + 1) % count());
     return currentIndex();
 }
 
 int TabWidget::switchToLeft()
 {
+    if (count() == 0)
+        return -1;
     switchTab(currentIndex() ? currentIndex() - 1 : count() - 1);
     return currentIndex();
 }
@@ -528,7 +611,7 @@ void TabWidget::changeScrollPosition(QAction *triggered)
 {
     QActionGroup *scrollPosition = static_cast<QActionGroup *>(sender());
     if(!scrollPosition)
-        qFatal("scrollPosition is NULL");
+        return;
 
     Properties::Instance()->scrollBarPos =
             scrollPosition->actions().indexOf(triggered);
@@ -542,7 +625,7 @@ void TabWidget::changeTabPosition(QAction *triggered)
 {
     QActionGroup *tabPosition = static_cast<QActionGroup *>(sender());
     if(!tabPosition)
-        qFatal("tabPosition is NULL");
+        return;
 
     Properties *prop = Properties::Instance();
     /* order is dictated from mainwindow.cpp */
@@ -556,7 +639,7 @@ void TabWidget::changeKeyboardCursorShape(QAction *triggered)
 {
     QActionGroup *keyboardCursorShape = static_cast<QActionGroup *>(sender());
     if(!keyboardCursorShape)
-        qFatal("keyboardCursorShape is NULL");
+        return;
 
     Properties::Instance()->keyboardCursorShape =
             keyboardCursorShape->actions().indexOf(triggered);
@@ -569,8 +652,8 @@ void TabWidget::propertiesChanged()
 {
     for (int i = 0; i < count(); ++i)
     {
-        TermWidgetHolder *console = static_cast<TermWidgetHolder*>(widget(i));
-        console->propertiesChanged();
+        if (auto *console = qobject_cast<TermWidgetHolder*>(widget(i)))
+            console->propertiesChanged();
     }
     showHideTabBar();
 
@@ -584,25 +667,30 @@ void TabWidget::propertiesChanged()
 
 void TabWidget::clearActiveTerminal()
 {
-    reinterpret_cast<TermWidgetHolder*>(widget(currentIndex()))->clearActiveTerminal();
+    if (auto *holder = terminalHolder())
+        holder->clearActiveTerminal();
 }
 
 void TabWidget::saveSession()
 {
     int ix = currentIndex();
-    reinterpret_cast<TermWidgetHolder*>(widget(ix))->saveSession(tabText(ix));
+    if (auto *holder = qobject_cast<TermWidgetHolder*>(widget(ix)))
+        holder->saveSession(tabText(ix));
 }
 
 void TabWidget::loadSession()
 {
-    reinterpret_cast<TermWidgetHolder*>(widget(currentIndex()))->loadSession();
+    if (auto *holder = terminalHolder())
+        holder->loadSession();
 }
 
 void TabWidget::preset2Horizontal()
 {
     TerminalConfig defaultConfig;
     int ix = TabWidget::addNewTab(defaultConfig);
-    TermWidgetHolder* term = reinterpret_cast<TermWidgetHolder*>(widget(ix));
+    auto *term = qobject_cast<TermWidgetHolder*>(widget(ix));
+    if (term == nullptr)
+        return;
 
     // NOTE: When splitting happens, the focus changes. Therefore, we should switch to
     // the 1st terminal only when the window is activated and the focus has really changed.
@@ -619,7 +707,9 @@ void TabWidget::preset2Vertical()
 {
     TerminalConfig defaultConfig;
     int ix = TabWidget::addNewTab(defaultConfig);
-    TermWidgetHolder* term = reinterpret_cast<TermWidgetHolder*>(widget(ix));
+    auto *term = qobject_cast<TermWidgetHolder*>(widget(ix));
+    if (term == nullptr)
+        return;
 
     // see preset2Horizontal() for an explanation
     QObject::disconnect(mFocusConnection);
@@ -635,7 +725,9 @@ void TabWidget::preset4Terminals()
 {
     TerminalConfig defaultConfig;
     int ix = TabWidget::addNewTab(defaultConfig);
-    TermWidgetHolder* term = reinterpret_cast<TermWidgetHolder*>(widget(ix));
+    auto *term = qobject_cast<TermWidgetHolder*>(widget(ix));
+    if (term == nullptr)
+        return;
 
     // see preset2Horizontal() for an explanation
     // Waiting for the first focus change is enough because, after it happens,
@@ -665,7 +757,7 @@ bool TabWidget::hasRunningProcess() const
 {
     for (int i = 0; i < count(); i++)
     {
-        if (TermWidgetHolder* term = reinterpret_cast<TermWidgetHolder*>(widget(i)))
+        if (TermWidgetHolder* term = qobject_cast<TermWidgetHolder*>(widget(i)))
         {
             if (term->hasRunningProcess())
             {
