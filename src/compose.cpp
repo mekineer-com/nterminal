@@ -10,8 +10,6 @@
 #include <QMouseEvent>
 #include <QRegularExpression>
 #include <QFile>
-#include <QGuiApplication>
-#include <QClipboard>
 #include <cmath>
 #include <algorithm>
 #include <limits>
