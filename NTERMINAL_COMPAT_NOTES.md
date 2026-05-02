@@ -2,6 +2,8 @@
 
 Last updated: 2026-05-01
 
+Audience: maintainers and contributors. This is the technical companion to `README.md` (which is the quick operator guide).
+
 ## What NTerminal Adds
 
 Fork of qterminal with a compose editor for AI CLIs (Claude Code, Codex, Gemini).
@@ -25,11 +27,11 @@ Fork of qterminal with a compose editor for AI CLIs (Claude Code, Codex, Gemini)
 ## Compatibility Matrix
 
 | CLI | Replace Prompt | Preserve `?` | Submit | Notes |
-|-----|---------------|-------------|--------|-------|
-| Claude Code | W | W | W | Clear: Ctrl+U. Submit: 200ms delays. Transfer: bracketed paste. |
-| Codex CLI | W | W | W | Clear: Ctrl+K + Ctrl+U ×8. Submit: Enter key after 100ms. |
-| Gemini CLI | W | W | W | Clear: Down×8 + Ctrl+E + Ctrl+U×8. `?` primer trick on both paths. |
-| bash/ash/zsh | W | W | W | Clear: Ctrl+K + Ctrl+U ×8. Submit: `\r` after 100ms (not Key_Return). |
+|-----|----------------|--------------|--------|-------|
+| Claude Code | Yes | Yes | Yes | Clear: Ctrl+U. Submit: 200ms delays. Transfer: bracketed paste. |
+| Codex CLI | Yes | Yes | Yes | Clear: Ctrl+K + Ctrl+U x8. Submit: Enter key after 100ms. |
+| Gemini CLI | Yes | Yes | Yes | Clear: Down x8 + Ctrl+E + Ctrl+U x8. `?` primer trick on both paths. |
+| bash/ash/zsh | Yes | Yes | Yes | Clear: Ctrl+K + Ctrl+U x8. Submit: `\r` after 100ms (not Key_Return). |
 
 ## Architecture
 
@@ -65,6 +67,11 @@ Upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638
 ### CMAKE_CURRENT_BINARY_DIR fix (CMakeLists.txt)
 Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when built as `add_subdirectory()`. Changed to `CMAKE_CURRENT_BINARY_DIR`.
 
+### Removed APIs / Behavior
+- `setSuppressPtyResize(bool)` removed (caused regressions and did not solve duplication).
+- `sendCurrentSizeToPty()` removed (no callers after suppress path removal).
+- `lastSelectedText` fallback cache removed from compose transfer path (caused stale ghost paste).
+
 ## Compose Editor Details
 
 - `documentMargin(2)` for left/right padding (prevents first-character clipping).
@@ -98,9 +105,12 @@ In `tui: fullscreen`, plain drag creates visual highlight but Screen repaints cl
 
 ## Build
 
-```
+```sh
 git clone --recurse-submodules https://github.com/mekineer-com/nterminal.git
-cd nterminal && mkdir build && cd build && cmake .. && make -j$(nproc)
+cd nterminal
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
 ```
 
 Launcher: set `NTERMINAL_COMPOSE=1` to enable compose mode.
