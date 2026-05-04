@@ -80,8 +80,10 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     });
 
     auto *sendReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_editor);
+    sendReturn->setContext(Qt::WidgetWithChildrenShortcut);
     connect(sendReturn, &QShortcut::activated, this, &ComposeInput::send);
     auto *sendEnter = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Enter), m_editor);
+    sendEnter->setContext(Qt::WidgetWithChildrenShortcut);
     connect(sendEnter, &QShortcut::activated, this, &ComposeInput::send);
 
     updateHeight();

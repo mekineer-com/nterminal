@@ -39,7 +39,7 @@ Enable compose mode at launch with `NTERMINAL_COMPOSE=1`.
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+Enter` | Send editor contents and execute |
+| `Ctrl+Enter` | Send editor contents and execute (editor focus only) |
 | `Ctrl+Numpad Enter` | Same as above |
 | `Ctrl+Shift+Up` | Transfer editor contents to terminal input (no execute) |
 | `Ctrl+Shift+Down` | Pull terminal selection into editor |

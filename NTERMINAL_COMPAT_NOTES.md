@@ -14,7 +14,7 @@ Fork of qterminal with a compose editor for AI CLIs (Claude Code, Codex, Gemini)
 - F6 toggles raw input mode (bypasses editor, types directly into terminal).
 
 **Keyboard shortcuts** (compose mode):
-- **Ctrl+Enter** — send editor contents to terminal
+- **Ctrl+Enter** — send editor contents to terminal (only when editor is focused)
 - **Ctrl+Shift+Down** — grab highlighted terminal text into editor (or just focus editor if nothing selected)
 - **Ctrl+Shift+Up** — transfer editor contents into terminal input without submitting
 - **F6** — toggle raw input mode
