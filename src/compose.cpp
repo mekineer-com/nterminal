@@ -371,12 +371,13 @@ void ComposeInput::send()
 
     if (cli == Cli::Claude)
     {
-        // 200ms between steps — Claude's async input handler needs settle time.
-        QTimer::singleShot(200, this, [this, text, findImpl, finish]() {
+        // Temporary diagnostic delay: use an extreme step delay to rule out timing misses.
+        constexpr int kClaudeSubmitStepDelayMs = 700;
+        QTimer::singleShot(kClaudeSubmitStepDelayMs, this, [this, text, findImpl, finish]() {
             TermWidgetImpl *i = findImpl();
             if (i == nullptr) { finish(); return; }
             i->sendText(text);
-            QTimer::singleShot(200, this, [this, findImpl, finish]() {
+            QTimer::singleShot(kClaudeSubmitStepDelayMs, this, [this, findImpl, finish]() {
                 TermWidgetImpl *i2 = findImpl();
                 if (i2 != nullptr) i2->sendText(QString(QLatin1Char('\r')));
                 finish();
