@@ -10,6 +10,7 @@
 #include <QMouseEvent>
 #include <QRegularExpression>
 #include <QFile>
+#include <QPointer>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -371,18 +372,41 @@ void ComposeInput::send()
 
     if (cli == Cli::Claude)
     {
-        // Temporary diagnostic delay: use an extreme step delay to rule out timing misses.
-        constexpr int kClaudeSubmitStepDelayMs = 700;
-        QTimer::singleShot(kClaudeSubmitStepDelayMs, this, [this, text, findImpl, finish]() {
+        constexpr int kClaudeSubmitAfterTextDelayMs = 120;
+        constexpr int kClaudeResizeSettleTimeoutMs = 700;
+
+        auto sendClaudeTextAndEnter = [this, text, findImpl, finish]() {
             TermWidgetImpl *i = findImpl();
             if (i == nullptr) { finish(); return; }
             i->sendText(text);
-            QTimer::singleShot(kClaudeSubmitStepDelayMs, this, [this, findImpl, finish]() {
+            QTimer::singleShot(kClaudeSubmitAfterTextDelayMs, this, [findImpl, finish]() {
                 TermWidgetImpl *i2 = findImpl();
                 if (i2 != nullptr) i2->sendText(QString(QLatin1Char('\r')));
                 finish();
             });
-        });
+        };
+
+        if (!impl->hasPendingTerminalResize())
+        {
+            sendClaudeTextAndEnter();
+        }
+        else
+        {
+            QObject *settleGate = new QObject(this);
+            QPointer<QObject> guard(settleGate);
+
+            connect(impl, &QTermWidget::terminalResizeSettled, settleGate, [guard, sendClaudeTextAndEnter]() {
+                if (!guard) return;
+                guard->deleteLater();
+                sendClaudeTextAndEnter();
+            });
+
+            QTimer::singleShot(kClaudeResizeSettleTimeoutMs, settleGate, [guard, sendClaudeTextAndEnter]() {
+                if (!guard) return;
+                guard->deleteLater();
+                sendClaudeTextAndEnter();
+            });
+        }
     }
     else if (cli == Cli::Gemini)
     {
