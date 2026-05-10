@@ -12,6 +12,7 @@ class QWidget;
 class QEvent;
 class TabWidget;
 class TermWidgetImpl;
+class QTermWidget;
 class TermWidget;
 
 class ComposeInput : public QObject
@@ -44,22 +45,19 @@ private:
     void clearTerminalInput(TermWidgetImpl *impl);
     QString normalizeSelection(const QString &text) const;
     void positionComposeEditor();
-    QRect termViewportRect(TermWidget *term) const;
-    void rememberBaseline(TermWidget *term, bool force);
     void applyCurrentTerminalOffset();
     int currentComposeOffset() const;
-    void setCurrentPtyResizeSuspended(bool suspended);
+    void setPtyResizeSuspended(QTermWidget *impl, bool suspended);
+    void clearAllPtyResizeSuspended();
 
     QWidget *m_container = nullptr;
     TabWidget *m_tabulator;
     QPlainTextEdit *m_editor = nullptr;
-    QHash<TermWidget *, QRect> m_termBaseline;
-    int m_baseComposeHeight = 0;
+    QRect m_tabBaseline;
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
-    bool m_suspendPtyResize = false;
-    QPointer<TermWidgetImpl> m_suspendedImpl;
+    QHash<QTermWidget *, bool> m_resizeSuspended;
 };
 
 #endif
