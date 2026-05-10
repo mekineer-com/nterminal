@@ -26,7 +26,6 @@
 #include <QTimer>
 #include <QGuiApplication>
 #include <QActionGroup>
-#include <QGridLayout>
 #include <QShortcut>
 #include <QFile>
 
@@ -188,10 +187,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::setupComposeInput()
 {
-    auto *layout = qobject_cast<QGridLayout*>(centralwidget->layout());
-    if (layout == nullptr) return;
-
-    m_compose = new ComposeInput(centralwidget, layout, consoleTabulator, this);
+    m_compose = new ComposeInput(centralwidget, consoleTabulator, this);
     if (!m_compose->isActive()) return;
 
     auto *toCompose = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Down), this);

@@ -4,7 +4,6 @@
 #include <QObject>
 
 class QPlainTextEdit;
-class QGridLayout;
 class QWidget;
 class QEvent;
 class TabWidget;
@@ -16,7 +15,7 @@ class ComposeInput : public QObject
     Q_OBJECT
 
 public:
-    ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent = nullptr);
+    ComposeInput(QWidget *container, TabWidget *tabulator, QObject *parent = nullptr);
 
     bool isActive() const { return m_active; }
     QPlainTextEdit *editor() { return m_editor; }
@@ -42,11 +41,9 @@ private:
     QString normalizeSelection(const QString &text) const;
     void positionComposeEditor();
     void applyCurrentTerminalOffset();
-    void updateLayoutReservation();
     int currentComposeOffset() const;
 
     QWidget *m_container = nullptr;
-    QGridLayout *m_hostLayout = nullptr;
     TabWidget *m_tabulator;
     QPlainTextEdit *m_editor = nullptr;
     bool m_active = false;

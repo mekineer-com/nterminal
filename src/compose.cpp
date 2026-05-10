@@ -1,7 +1,6 @@
 #include "compose.h"
 
 #include <QPlainTextEdit>
-#include <QGridLayout>
 #include <QShortcut>
 #include <QTimer>
 #include <QTextOption>
@@ -45,10 +44,9 @@ QString readProcCmdline(int pid)
 
 } // namespace
 
-ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent)
+ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *parent)
     : QObject(parent),
       m_container(container),
-      m_hostLayout(layout),
       m_tabulator(tabulator)
 {
     m_active = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
@@ -546,25 +544,20 @@ void ComposeInput::positionComposeEditor()
 
 void ComposeInput::applyCurrentTerminalOffset()
 {
-    updateLayoutReservation();
-}
-
-void ComposeInput::updateLayoutReservation()
-{
-    if (m_hostLayout == nullptr)
+    if (m_tabulator == nullptr)
     {
         return;
     }
 
-    const int reservation = currentComposeOffset();
-    const QMargins current = m_hostLayout->contentsMargins();
-    if (current.bottom() == reservation)
+    const int offset = -currentComposeOffset();
+    const QList<TermWidget*> terms = m_tabulator->findChildren<TermWidget*>();
+    for (TermWidget *t : terms)
     {
-        return;
+        if (TermWidgetImpl *impl = t != nullptr ? t->impl() : nullptr)
+        {
+            impl->setRenderTopOffset(offset);
+        }
     }
-
-    m_hostLayout->setContentsMargins(current.left(), current.top(), current.right(), reservation);
-    m_hostLayout->invalidate();
 }
 
 int ComposeInput::currentComposeOffset() const
