@@ -47,6 +47,7 @@ QString readProcCmdline(int pid)
 
 ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent)
     : QObject(parent),
+      m_container(container),
       m_tabulator(tabulator)
 {
     m_active = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
@@ -85,6 +86,7 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     connect(sendEnter, &QShortcut::activated, this, &ComposeInput::send);
 
     updateHeight();
+    onHostLayoutChanged(true);
     setRawInputMode(false);
 }
 
@@ -125,7 +127,18 @@ void ComposeInput::updateHeight()
     const int frame = m_editor->frameWidth() * 2;
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
+    const int oldOffset = currentComposeOffset();
     m_editor->setFixedHeight(newHeight);
+    if (m_baseComposeHeight <= 0)
+    {
+        m_baseComposeHeight = newHeight;
+    }
+    positionComposeEditor();
+    const int newOffset = currentComposeOffset();
+    if (newOffset != oldOffset)
+    {
+        applyCurrentTerminalOffset();
+    }
 }
 
 void ComposeInput::focusTerminal()
@@ -148,11 +161,15 @@ void ComposeInput::setRawInputMode(bool raw)
 
     if (raw)
     {
+        applyCurrentTerminalOffset();
+        setCurrentPtyResizeSuspended(false);
         focusTerminal();
     }
     else
     {
         updateHeight();
+        positionComposeEditor();
+        applyCurrentTerminalOffset();
         m_editor->setFocus(Qt::OtherFocusReason);
     }
 }
@@ -509,4 +526,184 @@ void ComposeInput::transferFromTerminal()
     m_editor->setFocus(Qt::OtherFocusReason);
     m_editor->insertPlainText(normalized);
     updateHeight();
+}
+
+void ComposeInput::onHostLayoutChanged(bool fromWindowResize)
+{
+    if (m_editor == nullptr)
+    {
+        return;
+    }
+
+    if (fromWindowResize)
+    {
+        setCurrentPtyResizeSuspended(false);
+    }
+
+    positionComposeEditor();
+
+    if (m_rawMode || !m_editor->isVisible())
+    {
+        setCurrentPtyResizeSuspended(false);
+        return;
+    }
+
+    TermWidget *term = currentTermWidget();
+    if (term == nullptr)
+    {
+        setCurrentPtyResizeSuspended(false);
+        return;
+    }
+
+    rememberBaseline(term, true);
+    applyCurrentTerminalOffset();
+}
+
+void ComposeInput::positionComposeEditor()
+{
+    if (m_editor == nullptr || m_container == nullptr)
+    {
+        return;
+    }
+
+    const int width = m_container->width();
+    const int height = m_editor->height();
+    const int top = std::max(0, m_container->height() - height);
+    m_editor->setGeometry(0, top, width, height);
+    m_editor->raise();
+}
+
+QRect ComposeInput::termViewportRect(TermWidget *term) const
+{
+    if (term == nullptr || m_container == nullptr)
+    {
+        return QRect();
+    }
+
+    TermWidgetImpl *impl = term->impl();
+    if (impl == nullptr)
+    {
+        return QRect();
+    }
+
+    const QPoint topLeft = impl->mapTo(m_container, QPoint(0, 0));
+    return QRect(topLeft, impl->size());
+}
+
+void ComposeInput::rememberBaseline(TermWidget *term, bool force)
+{
+    if (term == nullptr)
+    {
+        return;
+    }
+
+    const QRect rect = termViewportRect(term);
+    if (!rect.isValid())
+    {
+        return;
+    }
+
+    if (!m_termBaseline.contains(term))
+    {
+        connect(term, &QObject::destroyed, this, [this, term]() {
+            m_termBaseline.remove(term);
+        });
+    }
+
+    QRect baseline = rect;
+    if (force && m_termBaseline.contains(term))
+    {
+        baseline.translate(0, currentComposeOffset());
+    }
+
+    if (force || !m_termBaseline.contains(term))
+    {
+        m_termBaseline.insert(term, baseline);
+    }
+}
+
+void ComposeInput::applyCurrentTerminalOffset()
+{
+    TermWidget *term = currentTermWidget();
+    if (term == nullptr)
+    {
+        return;
+    }
+
+    TermWidgetImpl *impl = term->impl();
+    if (impl == nullptr)
+    {
+        return;
+    }
+
+    if (!m_termBaseline.contains(term))
+    {
+        rememberBaseline(term, true);
+    }
+
+    const QRect baseline = m_termBaseline.value(term);
+    if (!baseline.isValid())
+    {
+        return;
+    }
+
+    const int offset = currentComposeOffset();
+    const QPoint targetPos(baseline.x(), baseline.y() - offset);
+    if (impl->pos() == targetPos)
+    {
+        if (offset == 0)
+        {
+            setCurrentPtyResizeSuspended(false);
+        }
+        return;
+    }
+
+    if (offset == 0)
+    {
+        setCurrentPtyResizeSuspended(false);
+        impl->move(targetPos);
+        return;
+    }
+
+    setCurrentPtyResizeSuspended(true);
+    impl->move(targetPos);
+}
+
+int ComposeInput::currentComposeOffset() const
+{
+    if (m_editor == nullptr || m_rawMode || !m_editor->isVisible())
+    {
+        return 0;
+    }
+    if (m_baseComposeHeight <= 0)
+    {
+        return 0;
+    }
+    return std::max(0, m_editor->height() - m_baseComposeHeight);
+}
+
+void ComposeInput::setCurrentPtyResizeSuspended(bool suspended)
+{
+    TermWidgetImpl *impl = currentImpl();
+    if (impl == nullptr)
+    {
+        m_suspendPtyResize = false;
+        return;
+    }
+
+    if (suspended)
+    {
+        if (!m_suspendPtyResize)
+        {
+            impl->setPtyResizeSuspended(true);
+            m_suspendPtyResize = true;
+        }
+        return;
+    }
+
+    if (m_suspendPtyResize)
+    {
+        impl->setPtyResizeSuspended(false);
+        m_suspendPtyResize = false;
+    }
 }

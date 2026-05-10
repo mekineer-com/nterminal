@@ -102,7 +102,10 @@ private:
     void setDropLockShortCut(const QKeySequence& dropLockShortCut);
 
     ComposeInput *m_compose = nullptr;
+    QMetaObject::Connection m_composeFocusConnection;
     void setupComposeInput();
+    void syncComposeHostLayout(bool fromWindowResize);
+    void reconnectComposeFocusSignal();
 
     bool hasMultipleTabs(QAction *);
     bool hasMultipleSubterminals(QAction *);

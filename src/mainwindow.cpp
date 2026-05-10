@@ -207,6 +207,38 @@ void MainWindow::setupComposeInput()
         m_compose->setRawInputMode(!m_compose->editor()->isVisible());
     });
     addAction(toggle);
+
+    reconnectComposeFocusSignal();
+    syncComposeHostLayout(true);
+}
+
+void MainWindow::syncComposeHostLayout(bool fromWindowResize)
+{
+    if (m_compose == nullptr || !m_compose->isActive())
+    {
+        return;
+    }
+    m_compose->onHostLayoutChanged(fromWindowResize);
+}
+
+void MainWindow::reconnectComposeFocusSignal()
+{
+    QObject::disconnect(m_composeFocusConnection);
+
+    if (m_compose == nullptr || !m_compose->isActive())
+    {
+        return;
+    }
+
+    auto *holder = consoleTabulator->terminalHolder();
+    if (holder == nullptr)
+    {
+        return;
+    }
+
+    m_composeFocusConnection = connect(holder, &TermWidgetHolder::termFocusChanged, this, [this]() {
+        syncComposeHostLayout(false);
+    });
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
@@ -631,6 +663,8 @@ void MainWindow::setupCustomDirs()
 
 void MainWindow::on_consoleTabulator_currentChanged(int)
 {
+    reconnectComposeFocusSignal();
+    syncComposeHostLayout(false);
 }
 
 void MainWindow::toggleTabBar()
@@ -946,6 +980,11 @@ void MainWindow::handleHistory()
 
 bool MainWindow::event(QEvent *event)
 {
+    if (event->type() == QEvent::Show || event->type() == QEvent::Hide)
+    {
+        syncComposeHostLayout(false);
+    }
+
     if (event->type() == QEvent::WindowDeactivate)
     {
         if (m_dropMode &&
@@ -996,6 +1035,7 @@ bool MainWindow::event(QEvent *event)
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
+    syncComposeHostLayout(true);
 }
 
 void MainWindow::showEvent(QShowEvent* event)
@@ -1008,6 +1048,7 @@ void MainWindow::showEvent(QShowEvent* event)
         m_layerWindow->setMargins(QMargins(hMargin, 0, hMargin, vMargin));
     }
     QMainWindow::showEvent(event);
+    syncComposeHostLayout(false);
 }
 
 void MainWindow::newTerminalWindow()
