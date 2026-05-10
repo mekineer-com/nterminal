@@ -48,6 +48,7 @@ private:
     QPlainTextEdit *m_editor = nullptr;
     int m_editorHeight = 0;
     int m_editorBaselineHeight = 0;
+    int m_terminalBottomReserve = 0;
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;

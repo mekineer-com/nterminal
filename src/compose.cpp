@@ -128,6 +128,7 @@ void ComposeInput::updateHeight()
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
     m_editorBaselineHeight = oneLineHeight;
+    m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
     positionComposeEditor();
     applyCurrentTerminalOffset();
 }
@@ -553,12 +554,15 @@ void ComposeInput::applyCurrentTerminalOffset()
     }
 
     const int offset = -currentComposeOffset();
-    const int searchInset = (m_editor != nullptr && !m_rawMode) ? std::max(0, m_editorHeight) : 0;
+    const bool composeVisible = (m_editor != nullptr && !m_rawMode);
+    const int reserve = composeVisible ? m_terminalBottomReserve : 0;
+    const int searchInset = composeVisible ? std::max(0, m_editorHeight) : 0;
     const QList<TermWidget*> terms = m_tabulator->findChildren<TermWidget*>();
     for (TermWidget *t : terms)
     {
         if (TermWidgetImpl *impl = t != nullptr ? t->impl() : nullptr)
         {
+            impl->setRenderBottomReserve(reserve);
             impl->setRenderTopOffset(offset);
             impl->setSearchBarBottomInset(searchInset);
         }
