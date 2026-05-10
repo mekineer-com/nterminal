@@ -8,7 +8,6 @@
 #include <QTextDocument>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QEvent>
 #include <QRegularExpression>
 #include <QFile>
 #include <cmath>
@@ -48,7 +47,6 @@ QString readProcCmdline(int pid)
 
 ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent)
     : QObject(parent),
-      m_container(container),
       m_tabulator(tabulator)
 {
     m_active = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
@@ -71,22 +69,11 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     m_editor->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
     m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
-    Q_UNUSED(layout);
-    m_editor->raise();
+    layout->addWidget(m_editor, 1, 0);
+    layout->setRowStretch(0, 1);
+    layout->setRowStretch(1, 0);
 
     m_editor->viewport()->installEventFilter(this);
-    if (m_container != nullptr)
-    {
-        m_container->installEventFilter(this);
-    }
-    if (m_tabulator != nullptr)
-    {
-        m_tabulator->installEventFilter(this);
-        connect(m_tabulator, &QTabWidget::currentChanged, this, [this](int) {
-            refreshOverlayTargets();
-            scheduleOverlayRelayout();
-        });
-    }
 
     connect(m_editor->document(), &QTextDocument::contentsChanged, this, [this]() {
         QTimer::singleShot(0, this, &ComposeInput::updateHeight);
@@ -140,11 +127,7 @@ void ComposeInput::updateHeight()
     const int frame = m_editor->frameWidth() * 2;
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
-    if (m_editor->height() != newHeight)
-    {
-        m_editor->setFixedHeight(newHeight);
-    }
-    scheduleOverlayRelayout();
+    m_editor->setFixedHeight(newHeight);
 }
 
 void ComposeInput::focusTerminal()
@@ -164,7 +147,6 @@ void ComposeInput::setRawInputMode(bool raw)
 
     m_rawMode = raw;
     m_editor->setVisible(!raw);
-    scheduleOverlayRelayout();
 
     if (raw)
     {
@@ -193,145 +175,6 @@ bool ComposeInput::viewportEventFilter(QObject *watched, QEvent *event)
         }
     }
     return false;
-}
-
-bool ComposeInput::eventFilter(QObject *watched, QEvent *event)
-{
-    if (viewportEventFilter(watched, event))
-    {
-        return true;
-    }
-
-    if (event == nullptr)
-    {
-        return false;
-    }
-
-    switch (event->type())
-    {
-    case QEvent::Resize:
-    case QEvent::Move:
-    case QEvent::Show:
-    case QEvent::Hide:
-    case QEvent::LayoutRequest:
-        if (watched == m_container || watched == m_tabulator || watched == m_trackedHolder || watched == m_trackedTerm)
-        {
-            scheduleOverlayRelayout();
-        }
-        break;
-    default:
-        break;
-    }
-
-    return false;
-}
-
-void ComposeInput::scheduleOverlayRelayout()
-{
-    if (!m_active || m_overlayRelayoutPending)
-    {
-        return;
-    }
-
-    m_overlayRelayoutPending = true;
-    QTimer::singleShot(0, this, [this]() {
-        m_overlayRelayoutPending = false;
-        relayoutOverlay();
-    });
-}
-
-void ComposeInput::setTrackedTerm(TermWidget *term)
-{
-    if (m_trackedTerm == term)
-    {
-        return;
-    }
-
-    if (!m_trackedTerm.isNull())
-    {
-        m_trackedTerm.data()->removeEventFilter(this);
-    }
-
-    m_trackedTerm = term;
-    if (!m_trackedTerm.isNull())
-    {
-        m_trackedTerm.data()->installEventFilter(this);
-    }
-}
-
-void ComposeInput::refreshOverlayTargets()
-{
-    if (m_tabulator == nullptr)
-    {
-        setTrackedTerm(nullptr);
-        return;
-    }
-
-    TermWidgetHolder *holder = m_tabulator->terminalHolder();
-    if (holder != m_trackedHolder)
-    {
-        if (!m_trackedHolder.isNull())
-        {
-            m_trackedHolder.data()->removeEventFilter(this);
-        }
-        QObject::disconnect(m_holderFocusConnection);
-        m_trackedHolder = holder;
-        if (!m_trackedHolder.isNull())
-        {
-            m_trackedHolder.data()->installEventFilter(this);
-            m_holderFocusConnection = connect(m_trackedHolder, &TermWidgetHolder::termFocusChanged, this, [this]() {
-                refreshOverlayTargets();
-                scheduleOverlayRelayout();
-            });
-        }
-    }
-
-    setTrackedTerm(currentTermWidget());
-}
-
-void ComposeInput::relayoutOverlay()
-{
-    if (!m_active || m_editor == nullptr)
-    {
-        return;
-    }
-
-    if (m_rawMode)
-    {
-        m_editor->hide();
-        return;
-    }
-
-    refreshOverlayTargets();
-    if (m_container == nullptr || m_trackedTerm.isNull())
-    {
-        m_editor->hide();
-        return;
-    }
-
-    TermWidget *term = m_trackedTerm.data();
-    if (!term->isVisible())
-    {
-        m_editor->hide();
-        return;
-    }
-
-    const QPoint topLeft = term->mapTo(m_container, QPoint(0, 0));
-    const QRect hostRect(topLeft, term->size());
-    if (hostRect.width() <= 1 || hostRect.height() <= 1)
-    {
-        m_editor->hide();
-        return;
-    }
-
-    const int overlayHeight = std::max(1, std::min(m_editor->height(), hostRect.height()));
-    const int overlayWidth = std::max(1, hostRect.width());
-    const int x = hostRect.x();
-    const int y = hostRect.bottom() - overlayHeight + 1;
-
-    m_editor->setGeometry(x, y, overlayWidth, overlayHeight);
-    m_editor->show();
-    m_editor->raise();
 }
 
 ComposeInput::Cli ComposeInput::detectCli(TermWidgetImpl *impl)

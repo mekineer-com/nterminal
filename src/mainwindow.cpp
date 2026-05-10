@@ -189,6 +189,8 @@ MainWindow::~MainWindow()
 void MainWindow::setupComposeInput()
 {
     auto *layout = qobject_cast<QGridLayout*>(centralwidget->layout());
+    if (layout == nullptr) return;
+
     m_compose = new ComposeInput(centralwidget, layout, consoleTabulator, this);
     if (!m_compose->isActive()) return;
 
