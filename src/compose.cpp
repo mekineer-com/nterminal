@@ -685,25 +685,35 @@ int ComposeInput::currentComposeOffset() const
 void ComposeInput::setCurrentPtyResizeSuspended(bool suspended)
 {
     TermWidgetImpl *impl = currentImpl();
-    if (impl == nullptr)
-    {
-        m_suspendPtyResize = false;
-        return;
-    }
-
     if (suspended)
     {
-        if (!m_suspendPtyResize)
+        if (impl == nullptr)
         {
-            impl->setPtyResizeSuspended(true);
-            m_suspendPtyResize = true;
+            return;
         }
+        if (m_suspendPtyResize && m_suspendedImpl == impl)
+        {
+            return;
+        }
+        if (m_suspendPtyResize && !m_suspendedImpl.isNull())
+        {
+            m_suspendedImpl->setPtyResizeSuspended(false);
+        }
+        impl->setPtyResizeSuspended(true);
+        m_suspendedImpl = impl;
+        m_suspendPtyResize = true;
         return;
     }
 
-    if (m_suspendPtyResize)
+    if (!m_suspendPtyResize)
     {
-        impl->setPtyResizeSuspended(false);
-        m_suspendPtyResize = false;
+        return;
     }
+
+    if (!m_suspendedImpl.isNull())
+    {
+        m_suspendedImpl->setPtyResizeSuspended(false);
+    }
+    m_suspendedImpl = nullptr;
+    m_suspendPtyResize = false;
 }

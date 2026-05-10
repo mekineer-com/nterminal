@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QHash>
+#include <QPointer>
 #include <QRect>
 
 class QPlainTextEdit;
@@ -58,6 +59,7 @@ private:
     bool m_rawMode = false;
     bool m_submitInProgress = false;
     bool m_suspendPtyResize = false;
+    QPointer<TermWidgetImpl> m_suspendedImpl;
 };
 
 #endif
