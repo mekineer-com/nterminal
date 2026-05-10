@@ -44,6 +44,17 @@ QString readProcCmdline(int pid)
     return QString::fromLocal8Bit(raw).trimmed();
 }
 
+int readLineSetting(const char *name, int fallback, int minValue)
+{
+    bool ok = false;
+    const int value = qEnvironmentVariableIntValue(name, &ok);
+    if (!ok || value < minValue)
+    {
+        return fallback;
+    }
+    return value;
+}
+
 } // namespace
 
 ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent)
@@ -71,8 +82,16 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
     layout->addWidget(m_editor, 1, 0);
+
+    m_bottomReserveSpacer = new QWidget(container);
+    m_bottomReserveSpacer->setObjectName(QStringLiteral("composeReserveSpacer"));
+    m_bottomReserveSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_bottomReserveSpacer->setFocusPolicy(Qt::NoFocus);
+    layout->addWidget(m_bottomReserveSpacer, 2, 0);
+
     layout->setRowStretch(0, 1);
     layout->setRowStretch(1, 0);
+    layout->setRowStretch(2, 0);
 
     m_editor->viewport()->installEventFilter(this);
 
@@ -112,12 +131,9 @@ void ComposeInput::updateHeight()
         return;
     }
 
-    bool ok = false;
-    int maxLines = qEnvironmentVariableIntValue("NTERMINAL_COMPOSE_MAX_LINES", &ok);
-    if (!ok || maxLines < 2)
-    {
-        maxLines = 12;
-    }
+    const int maxLines = readLineSetting("NTERMINAL_COMPOSE_MAX_LINES", 12, 2);
+    int reserveLines = readLineSetting("NTERMINAL_COMPOSE_RESERVE_LINES", maxLines, 2);
+    reserveLines = std::max(reserveLines, maxLines);
 
     const qreal docHeight = m_editor->document()->size().height();
     int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
@@ -126,9 +142,22 @@ void ComposeInput::updateHeight()
     const QFontMetrics fm(m_editor->font());
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
+    const int reserveHeight = frame + padding + (reserveLines * fm.lineSpacing());
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
-    m_editor->setFixedHeight(newHeight);
+    if (m_editor->height() != newHeight)
+    {
+        m_editor->setFixedHeight(newHeight);
+    }
+
+    if (m_bottomReserveSpacer != nullptr)
+    {
+        const int spacerHeight = std::max(0, reserveHeight - newHeight);
+        if (m_bottomReserveSpacer->height() != spacerHeight)
+        {
+            m_bottomReserveSpacer->setFixedHeight(spacerHeight);
+        }
+    }
 }
 
 void ComposeInput::focusTerminal()
@@ -148,6 +177,10 @@ void ComposeInput::setRawInputMode(bool raw)
 
     m_rawMode = raw;
     m_editor->setVisible(!raw);
+    if (m_bottomReserveSpacer != nullptr)
+    {
+        m_bottomReserveSpacer->setVisible(!raw);
+    }
 
     if (raw)
     {
