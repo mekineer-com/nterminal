@@ -69,9 +69,7 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     m_editor->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
     m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
-    layout->addWidget(m_editor, 1, 0);
-    layout->setRowStretch(0, 1);
-    layout->setRowStretch(1, 0);
+    Q_UNUSED(layout);
 
     m_editor->viewport()->installEventFilter(this);
 
