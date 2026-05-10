@@ -1,0 +1,70 @@
+# Move-Without-Resize Plan
+
+## Goal
+Keep terminal rows/columns stable while compose grows.
+
+The terminal should move upward inside the window as compose grows at the bottom. The terminal should not be resized during that growth.
+
+## Why This Plan
+The core failure mode is not submit timing. The core failure mode is resize churn.
+
+When terminal height changes, qtermwidget recomputes lines, PTY gets `setWindowSize`, and the CLI process receives size-change signals. That chain causes redraw churn and can lead to repeated headers/multiples. Timing tweaks can hide symptoms but do not remove this chain.
+
+This plan removes the chain by preserving terminal size and changing only position.
+
+## Why Earlier Approaches Were Insufficient
+`Submit delay` helped command-send reliability, but did not address terminal resize side effects.
+
+`Debounce` reduced how often resize updates fired, but resize still happened eventually.
+
+`Suppress` blocked updates in risky ways and produced side effects (missing status lines, instability).
+
+`Overlay editor over terminal` avoided some layout pressure but still treated editor behavior as the center of control instead of enforcing a strict terminal-size contract.
+
+## Core Principle
+Treat terminal geometry as a contract:
+
+The terminal viewport size is fixed for the current window state.
+
+Compose growth is handled by moving terminal position, not changing terminal size.
+
+If size does not change, PTY rows/cols do not change, and the CLI does not see moving top/bottom boundaries.
+
+## Implementation Strategy
+Phase 1: Capture a stable terminal geometry baseline.
+Why: We need one source of truth for width/height to prevent accidental relayout writes.
+
+Phase 2: Anchor compose to bottom and allow vertical growth.
+Why: Compose growth is desired behavior; growth itself is not a bug.
+
+Phase 3: Translate terminal upward by compose height delta.
+Why: This creates visual space for compose without touching terminal size.
+
+Phase 4: Recompute only positions on resize, tab switch, split focus change, and show/hide.
+Why: Position updates are required for correctness, but size updates must stay blocked.
+
+Phase 5: Guard against hidden resize writes.
+Why: Any path that calls terminal resize during compose growth breaks the contract.
+
+## Non-Goals
+Do not optimize submit timing in this pass unless it blocks correctness.
+
+Do not add new debounce layers as a primary fix.
+
+Do not change PTY protocol behavior.
+
+## Acceptance Criteria
+Compose can grow/shrink and terminal remains same width/height from the PTY perspective.
+
+No repeated init/after-compact header blocks caused by compose growth interactions.
+
+No statusline disappearance/regression caused by compose interactions.
+
+`Ctrl+Shift+Down`, manual typing, and multiline compose editing all preserve stable terminal rows/cols.
+
+## Risk Notes
+If any code path still derives terminal size from layout row height, the bug can return.
+
+If split/tab focus changes are not tracked, compose/terminal positioning can desync.
+
+If terminal movement leaks into size writes by framework side effects, add explicit guards at the boundary where PTY resize is requested.
