@@ -86,3 +86,32 @@ How to implement it in this codebase:
 
 When this would fail:
 If some hidden path still recalculates terminal size from layout height during compose growth, PTY resize events will still leak through. That is why the guard in step 6 is important.
+
+## 2026-05-10 Revised Plan (Layout Reservation)
+### Why the previous approach failed
+- Moving `TabWidget` with `move()` creates fragile geometry behavior.
+- `TabWidget` has its own method named `move(Direction)`, which is a smell for this path.
+- The editor can still overlay status lines if position and container math drift by even a little.
+- Freezing PTY resize caused stale width/columns; unfreezing restored width but overlay remained.
+
+### Better approach
+- Keep terminal and tab widgets fully layout-managed.
+- Reserve bottom space in the central layout equal to compose editor height.
+- Keep editor as an overlay child pinned to bottom of the window.
+- Never move terminal widgets manually.
+- Never suspend PTY resize for normal compose editing.
+
+### Implementation steps
+1. Store the central `QGridLayout*` in `ComposeInput`.
+2. Replace move-based offset logic with one function that updates layout bottom margin:
+   - margin = editor height when compose is visible
+   - margin = 0 when compose is hidden/raw mode
+3. Keep editor `setGeometry(0, containerHeight - editorHeight, containerWidth, editorHeight)` and `raise()`.
+4. Remove baseline and manual move state (`m_tabBaseline` and related math).
+5. Keep `onHostLayoutChanged()` as the trigger point for resize/tab/split/show/hide, but make it call only:
+   - `positionComposeEditor()`
+   - `updateLayoutReservation()`
+6. Validate behavior:
+   - status line remains visible at startup
+   - editor growth does not cover terminal content
+   - terminal width/columns keep updating with window resize

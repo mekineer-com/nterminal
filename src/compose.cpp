@@ -48,6 +48,7 @@ QString readProcCmdline(int pid)
 ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *tabulator, QObject *parent)
     : QObject(parent),
       m_container(container),
+      m_hostLayout(layout),
       m_tabulator(tabulator)
 {
     m_active = qEnvironmentVariableIsSet("NTERMINAL_COMPOSE")
@@ -69,8 +70,6 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     m_editor->document()->setDocumentMargin(2);
     m_editor->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
     m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
-
-    Q_UNUSED(layout);
 
     m_editor->viewport()->installEventFilter(this);
 
@@ -127,14 +126,9 @@ void ComposeInput::updateHeight()
     const int frame = m_editor->frameWidth() * 2;
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
-    const int oldOffset = currentComposeOffset();
     m_editor->setFixedHeight(newHeight);
     positionComposeEditor();
-    const int newOffset = currentComposeOffset();
-    if (newOffset != oldOffset)
-    {
-        applyCurrentTerminalOffset();
-    }
+    applyCurrentTerminalOffset();
 }
 
 void ComposeInput::focusTerminal()
@@ -525,35 +519,14 @@ void ComposeInput::transferFromTerminal()
 
 void ComposeInput::onHostLayoutChanged(bool fromWindowResize)
 {
+    Q_UNUSED(fromWindowResize);
+
     if (m_editor == nullptr)
     {
         return;
     }
 
-    if (fromWindowResize)
-    {
-        // Keep baseline aligned with normal window/layout changes.
-    }
-
     positionComposeEditor();
-
-    if (m_rawMode || !m_editor->isVisible())
-    {
-        return;
-    }
-
-    if (m_tabulator == nullptr)
-    {
-        return;
-    }
-
-    QPoint baselinePos = m_tabulator->pos();
-    baselinePos.ry() += currentComposeOffset();
-    if (fromWindowResize || !m_tabBaseline.isValid())
-    {
-        m_tabBaseline = QRect(baselinePos, m_tabulator->size());
-    }
-
     applyCurrentTerminalOffset();
 }
 
@@ -573,24 +546,25 @@ void ComposeInput::positionComposeEditor()
 
 void ComposeInput::applyCurrentTerminalOffset()
 {
-    if (m_tabulator == nullptr)
+    updateLayoutReservation();
+}
+
+void ComposeInput::updateLayoutReservation()
+{
+    if (m_hostLayout == nullptr)
     {
         return;
     }
 
-    if (!m_tabBaseline.isValid())
+    const int reservation = currentComposeOffset();
+    const QMargins current = m_hostLayout->contentsMargins();
+    if (current.bottom() == reservation)
     {
-        QPoint baselinePos = m_tabulator->pos();
-        baselinePos.ry() += currentComposeOffset();
-        m_tabBaseline = QRect(baselinePos, m_tabulator->size());
+        return;
     }
 
-    const int offset = currentComposeOffset();
-    const QPoint targetPos(m_tabBaseline.x(), m_tabBaseline.y() - offset);
-    if (m_tabulator->pos() != targetPos)
-    {
-        static_cast<QWidget*>(m_tabulator)->move(targetPos);
-    }
+    m_hostLayout->setContentsMargins(current.left(), current.top(), current.right(), reservation);
+    m_hostLayout->invalidate();
 }
 
 int ComposeInput::currentComposeOffset() const

@@ -2,7 +2,6 @@
 #define COMPOSE_H
 
 #include <QObject>
-#include <QRect>
 
 class QPlainTextEdit;
 class QGridLayout;
@@ -43,12 +42,13 @@ private:
     QString normalizeSelection(const QString &text) const;
     void positionComposeEditor();
     void applyCurrentTerminalOffset();
+    void updateLayoutReservation();
     int currentComposeOffset() const;
 
     QWidget *m_container = nullptr;
+    QGridLayout *m_hostLayout = nullptr;
     TabWidget *m_tabulator;
     QPlainTextEdit *m_editor = nullptr;
-    QRect m_tabBaseline;
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
