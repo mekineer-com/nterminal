@@ -122,10 +122,12 @@ void ComposeInput::updateHeight()
     const QFontMetrics fm(m_editor->font());
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
+    const int oneLineHeight = frame + padding + fm.lineSpacing();
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
+    m_editorBaselineHeight = oneLineHeight;
     positionComposeEditor();
     applyCurrentTerminalOffset();
 }
@@ -567,5 +569,5 @@ int ComposeInput::currentComposeOffset() const
     {
         return 0;
     }
-    return std::max(0, m_editorHeight);
+    return std::max(0, m_editorHeight - m_editorBaselineHeight);
 }
