@@ -553,12 +553,14 @@ void ComposeInput::applyCurrentTerminalOffset()
     }
 
     const int offset = -currentComposeOffset();
+    const int searchInset = (m_editor != nullptr && !m_rawMode) ? std::max(0, m_editorHeight) : 0;
     const QList<TermWidget*> terms = m_tabulator->findChildren<TermWidget*>();
     for (TermWidget *t : terms)
     {
         if (TermWidgetImpl *impl = t != nullptr ? t->impl() : nullptr)
         {
             impl->setRenderTopOffset(offset);
+            impl->setSearchBarBottomInset(searchInset);
         }
     }
 }
