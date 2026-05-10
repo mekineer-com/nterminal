@@ -68,3 +68,21 @@ If any code path still derives terminal size from layout row height, the bug can
 If split/tab focus changes are not tracked, compose/terminal positioning can desync.
 
 If terminal movement leaks into size writes by framework side effects, add explicit guards at the boundary where PTY resize is requested.
+
+## Feasibility And Concrete Implementation
+Yes, this is possible. You are not inventing impossible behavior.
+
+Why it is possible:
+Qt lets us move a child widget without changing its width/height. If width/height do not change, terminal row/column size does not need to change.
+
+How to implement it in this codebase:
+1. In `src/compose.cpp`, stop putting compose in layout row math as the thing that changes terminal height during typing.
+2. Keep one fixed terminal widget size baseline per active terminal view (capture after normal window resize, not after compose growth).
+3. On compose height change, move the terminal widget up by compose height delta (`move(x, baselineY - composeHeight)`), but keep `resize(width, height)` untouched.
+4. Keep compose pinned to the bottom of the visible container and let compose grow upward.
+5. Re-run only position updates (not size updates) on these events: window resize, tab switch, split focus change, show/hide.
+6. In the resize bridge to PTY (`Session::updateTerminalSize` call path), add a guard flag for compose-driven movement so move-only operations cannot trigger PTY resize writes.
+7. Validate with live checks: while typing multiline compose, terminal rows/cols stay constant and multiples do not appear.
+
+When this would fail:
+If some hidden path still recalculates terminal size from layout height during compose growth, PTY resize events will still leak through. That is why the guard in step 6 is important.
