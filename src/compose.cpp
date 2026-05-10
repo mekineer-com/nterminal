@@ -2,7 +2,6 @@
 
 #include <QPlainTextEdit>
 #include <QGridLayout>
-#include <QSet>
 #include <QShortcut>
 #include <QTimer>
 #include <QTextOption>
@@ -159,7 +158,6 @@ void ComposeInput::setRawInputMode(bool raw)
     if (raw)
     {
         applyCurrentTerminalOffset();
-        clearAllPtyResizeSuspended();
         focusTerminal();
     }
     else
@@ -534,20 +532,18 @@ void ComposeInput::onHostLayoutChanged(bool fromWindowResize)
 
     if (fromWindowResize)
     {
-        clearAllPtyResizeSuspended();
+        // Keep baseline aligned with normal window/layout changes.
     }
 
     positionComposeEditor();
 
     if (m_rawMode || !m_editor->isVisible())
     {
-        clearAllPtyResizeSuspended();
         return;
     }
 
     if (m_tabulator == nullptr)
     {
-        clearAllPtyResizeSuspended();
         return;
     }
 
@@ -595,50 +591,6 @@ void ComposeInput::applyCurrentTerminalOffset()
     {
         static_cast<QWidget*>(m_tabulator)->move(targetPos);
     }
-
-    TermWidgetHolder *holder = m_tabulator->terminalHolder();
-    if (holder == nullptr)
-    {
-        if (offset == 0)
-        {
-            clearAllPtyResizeSuspended();
-        }
-        return;
-    }
-
-    const bool suspend = offset > 0;
-    QSet<QTermWidget*> seen;
-    const QList<TermWidget*> terms = holder->findChildren<TermWidget*>();
-    for (TermWidget *term : terms)
-    {
-        if (term == nullptr)
-        {
-            continue;
-        }
-        QTermWidget *impl = term->impl();
-        if (impl == nullptr)
-        {
-            continue;
-        }
-        seen.insert(impl);
-        setPtyResizeSuspended(impl, suspend);
-    }
-
-    if (!suspend)
-    {
-        clearAllPtyResizeSuspended();
-        return;
-    }
-
-    const QList<QTermWidget*> tracked = m_resizeSuspended.keys();
-    for (QTermWidget *impl : tracked)
-    {
-        if (!seen.contains(impl))
-        {
-            setPtyResizeSuspended(impl, false);
-            m_resizeSuspended.remove(impl);
-        }
-    }
 }
 
 int ComposeInput::currentComposeOffset() const
@@ -648,32 +600,4 @@ int ComposeInput::currentComposeOffset() const
         return 0;
     }
     return std::max(0, m_editor->height());
-}
-
-void ComposeInput::setPtyResizeSuspended(QTermWidget *impl, bool suspended)
-{
-    if (impl == nullptr)
-    {
-        return;
-    }
-    const bool current = m_resizeSuspended.value(impl, false);
-    if (current == suspended)
-    {
-        return;
-    }
-    impl->setPtyResizeSuspended(suspended);
-    m_resizeSuspended.insert(impl, suspended);
-}
-
-void ComposeInput::clearAllPtyResizeSuspended()
-{
-    const QList<QTermWidget*> tracked = m_resizeSuspended.keys();
-    for (QTermWidget *impl : tracked)
-    {
-        if (impl != nullptr)
-        {
-            impl->setPtyResizeSuspended(false);
-        }
-    }
-    m_resizeSuspended.clear();
 }

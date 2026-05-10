@@ -2,8 +2,6 @@
 #define COMPOSE_H
 
 #include <QObject>
-#include <QHash>
-#include <QPointer>
 #include <QRect>
 
 class QPlainTextEdit;
@@ -12,7 +10,6 @@ class QWidget;
 class QEvent;
 class TabWidget;
 class TermWidgetImpl;
-class QTermWidget;
 class TermWidget;
 
 class ComposeInput : public QObject
@@ -47,8 +44,6 @@ private:
     void positionComposeEditor();
     void applyCurrentTerminalOffset();
     int currentComposeOffset() const;
-    void setPtyResizeSuspended(QTermWidget *impl, bool suspended);
-    void clearAllPtyResizeSuspended();
 
     QWidget *m_container = nullptr;
     TabWidget *m_tabulator;
@@ -57,7 +52,6 @@ private:
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
-    QHash<QTermWidget *, bool> m_resizeSuspended;
 };
 
 #endif
