@@ -675,11 +675,7 @@ int ComposeInput::currentComposeOffset() const
     {
         return 0;
     }
-    if (m_baseComposeHeight <= 0)
-    {
-        return 0;
-    }
-    return std::max(0, m_editor->height() - m_baseComposeHeight);
+    return std::max(0, m_editor->height());
 }
 
 void ComposeInput::setCurrentPtyResizeSuspended(bool suspended)
