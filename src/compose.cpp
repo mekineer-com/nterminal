@@ -11,7 +11,6 @@
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
-#include <cmath>
 #include <algorithm>
 #include <limits>
 
@@ -62,7 +61,7 @@ ComposeInput::ComposeInput(QWidget *container, QGridLayout *layout, TabWidget *t
     m_editor->setFrameShape(QFrame::NoFrame);
     m_editor->setTabChangesFocus(false);
     m_editor->setUndoRedoEnabled(true);
-    m_editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_editor->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_editor->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_editor->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -113,22 +112,21 @@ void ComposeInput::updateHeight()
     }
 
     bool ok = false;
-    int maxLines = qEnvironmentVariableIntValue("NTERMINAL_COMPOSE_MAX_LINES", &ok);
-    if (!ok || maxLines < 2)
+    int composeLines = qEnvironmentVariableIntValue("NTERMINAL_COMPOSE_LINES", &ok);
+    if (!ok || composeLines < 2)
     {
-        maxLines = 12;
+        composeLines = 6;
     }
-
-    const qreal docHeight = m_editor->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
-    visualLines = std::min(visualLines, maxLines);
 
     const QFontMetrics fm(m_editor->font());
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
-    const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
+    const int newHeight = frame + padding + (composeLines * fm.lineSpacing());
 
-    m_editor->setFixedHeight(newHeight);
+    if (m_editor->height() != newHeight)
+    {
+        m_editor->setFixedHeight(newHeight);
+    }
 }
 
 void ComposeInput::focusTerminal()
