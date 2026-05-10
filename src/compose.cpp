@@ -125,6 +125,7 @@ void ComposeInput::updateHeight()
     const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
     m_editor->setFixedHeight(newHeight);
+    m_editorHeight = newHeight;
     positionComposeEditor();
     applyCurrentTerminalOffset();
 }
@@ -562,9 +563,9 @@ void ComposeInput::applyCurrentTerminalOffset()
 
 int ComposeInput::currentComposeOffset() const
 {
-    if (m_editor == nullptr || m_rawMode || !m_editor->isVisible())
+    if (m_editor == nullptr || m_rawMode)
     {
         return 0;
     }
-    return std::max(0, m_editor->height());
+    return std::max(0, m_editorHeight);
 }

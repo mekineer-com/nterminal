@@ -46,6 +46,7 @@ private:
     QWidget *m_container = nullptr;
     TabWidget *m_tabulator;
     QPlainTextEdit *m_editor = nullptr;
+    int m_editorHeight = 0;
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
