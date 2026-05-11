@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QRegularExpression>
 #include <QFile>
+#include <QPointer>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -373,19 +374,19 @@ void ComposeInput::send()
     m_submitInProgress = true;
     clearTerminalInput(impl);
     auto finish = [this]() { m_submitInProgress = false; };
-    auto findImpl = [this]() -> TermWidgetImpl* { return currentImpl(); };
+    QPointer<TermWidgetImpl> target(impl);
 
     if (cli == Cli::Claude)
     {
         constexpr int kClaudeAfterClearDelayMs = 150;
         constexpr int kClaudeSubmitAfterTextDelayMs = 120;
 
-        QTimer::singleShot(kClaudeAfterClearDelayMs, this, [this, text, findImpl, finish]() {
-            TermWidgetImpl *i = findImpl();
+        QTimer::singleShot(kClaudeAfterClearDelayMs, this, [text, target, finish]() {
+            TermWidgetImpl *i = target.data();
             if (i == nullptr) { finish(); return; }
             i->sendText(text);
-            QTimer::singleShot(kClaudeSubmitAfterTextDelayMs, this, [findImpl, finish]() {
-                TermWidgetImpl *i2 = findImpl();
+            QTimer::singleShot(kClaudeSubmitAfterTextDelayMs, i, [target, finish]() {
+                TermWidgetImpl *i2 = target.data();
                 if (i2 != nullptr) i2->sendText(QString(QLatin1Char('\r')));
                 finish();
             });
@@ -394,16 +395,16 @@ void ComposeInput::send()
     else if (cli == Cli::Gemini)
     {
         // 200ms for clear to settle, then '?' fires help menu (dc11ca6).
-        QTimer::singleShot(200, this, [this, text, findImpl, finish]() {
-            TermWidgetImpl *i = findImpl();
+        QTimer::singleShot(200, this, [text, target, finish]() {
+            TermWidgetImpl *i = target.data();
             if (i == nullptr) { finish(); return; }
             i->sendText(QStringLiteral("?"));
-            QTimer::singleShot(100, this, [this, text, findImpl, finish]() {
-                TermWidgetImpl *i2 = findImpl();
+            QTimer::singleShot(100, i, [text, target, finish]() {
+                TermWidgetImpl *i2 = target.data();
                 if (i2 == nullptr) { finish(); return; }
                 i2->sendText(text);
-                QTimer::singleShot(200, this, [this, findImpl, finish]() {
-                    TermWidgetImpl *i3 = findImpl();
+                QTimer::singleShot(200, i2, [target, finish]() {
+                    TermWidgetImpl *i3 = target.data();
                     if (i3 != nullptr) i3->sendText(QString(QLatin1Char('\r')));
                     finish();
                 });
@@ -413,8 +414,8 @@ void ComposeInput::send()
     else if (cli == Cli::Codex)
     {
         impl->sendText(text);
-        QTimer::singleShot(100, this, [this, findImpl, finish]() {
-            TermWidgetImpl *i = findImpl();
+        QTimer::singleShot(100, this, [this, target, finish]() {
+            TermWidgetImpl *i = target.data();
             if (i != nullptr) sendKey(i, Qt::Key_Return);
             finish();
         });
@@ -423,8 +424,8 @@ void ComposeInput::send()
     {
         // sendText("\r") not sendKey(Return) — avoids extra Enter in readline (0c1201c).
         impl->sendText(text);
-        QTimer::singleShot(100, this, [this, findImpl, finish]() {
-            TermWidgetImpl *i = findImpl();
+        QTimer::singleShot(100, this, [target, finish]() {
+            TermWidgetImpl *i = target.data();
             if (i != nullptr) i->sendText(QString(QLatin1Char('\r')));
             finish();
         });
@@ -468,11 +469,12 @@ void ComposeInput::transferToTerminal()
 
     clearTerminalInput(impl);
     const Cli cli = detectCli(impl);
+    QPointer<TermWidgetImpl> target(impl);
 
     if (cli == Cli::Claude)
     {
-        QTimer::singleShot(100, this, [this, text]() {
-            TermWidgetImpl *i = currentImpl();
+        QTimer::singleShot(100, this, [this, text, target]() {
+            TermWidgetImpl *i = target.data();
             if (i == nullptr) return;
             i->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
             focusTerminal();
@@ -481,8 +483,8 @@ void ComposeInput::transferToTerminal()
     else if (cli == Cli::Gemini)
     {
         impl->sendText(QStringLiteral("?"));
-        QTimer::singleShot(100, this, [this, text]() {
-            TermWidgetImpl *i = currentImpl();
+        QTimer::singleShot(100, this, [this, text, target]() {
+            TermWidgetImpl *i = target.data();
             if (i == nullptr) return;
             i->sendText(text);
             focusTerminal();
@@ -521,6 +523,8 @@ void ComposeInput::transferFromTerminal()
 
 void ComposeInput::onHostLayoutChanged(bool fromWindowResize)
 {
+    // Reserved for future baseline-capture split between real window resize
+    // and compose-only layout updates; keep parameter to avoid API churn now.
     Q_UNUSED(fromWindowResize);
 
     if (m_editor == nullptr)
@@ -562,6 +566,10 @@ void ComposeInput::applyCurrentTerminalOffset()
     {
         if (TermWidgetImpl *impl = t != nullptr ? t->impl() : nullptr)
         {
+            // Intentional one-time PTY resize can happen here when reserve flips
+            // from 0 to non-zero (or back), so the app's usable rows match the
+            // compose-reserved area. Compose growth itself uses top offset and
+            // should not cause ongoing resize churn.
             impl->setRenderBottomReserve(reserve);
             impl->setRenderTopOffset(offset);
             impl->setSearchBarBottomInset(searchInset);
