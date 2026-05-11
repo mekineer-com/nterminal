@@ -121,8 +121,6 @@ protected slots:
 
 private:
     int tabNumerator;
-    /* re-order naming of the tabs then removeCurrentTab() */
-    void renameTabsAfterRemove();
     int switchTo(int index);
 
     TabBar *mTabBar;

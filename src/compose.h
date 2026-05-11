@@ -26,7 +26,7 @@ public:
     void transferToTerminal();
     void transferFromTerminal();
     void focusTerminal();
-    void onHostLayoutChanged(bool fromWindowResize);
+    void onHostLayoutChanged();
 
     bool viewportEventFilter(QObject *watched, QEvent *event);
     TermWidgetImpl *currentImpl();

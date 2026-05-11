@@ -80,37 +80,9 @@ void TermWidgetHolder::loadSession()
                                          0, false, &ok);
     if (!ok || name.isEmpty())
         return;
-#if 0
-    foreach (QWidget * w, findChildren<QWidget*>())
-    {
-        if (w)
-        {
-            delete w;
-            w = 0;
-        }
-    }
 
-    qDebug() << "load" << name << QString(Properties::Instance()->sessions[name]);
-    QStringList splitters = QString(Properties::Instance()->sessions[name]).split("|", QString::SkipEmptyParts);
-    foreach (QString splitter, splitters)
-    {
-        QStringList components = splitter.split(",");
-        qDebug() << "comp" << components;
-        // orientation
-        Qt::Orientation orientation;
-        if (components.size() > 0)
-            orientation = components.takeAt(0).toInt();
-        // sizes
-        QList<int> sizes;
-        QList<TermWidget*> widgets;
-        foreach (QString s, components)
-        {
-            sizes << s.toInt();
-            widgets << newTerm();
-        }
-        // new terms
-    }
-#endif
+    Q_UNUSED(name);
+    qWarning() << "Load Session is currently unavailable.";
 }
 
 void TermWidgetHolder::saveSession(const QString & name)

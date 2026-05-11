@@ -117,8 +117,8 @@ void parse_args(int argc, char* argv[], QString& workdir, QStringList & shell_co
     }
     while(next_option != -1);
 
-    // FIXME: The app might not exit in the dropdown mode after the shell command is terminated
-    // and the window is closed. For now, the dropdown mode is disabled with command execution.
+    // Keep dropdown mode off when a command is provided. This avoids a known
+    // shutdown edge case where the process can stay alive after command exit.
     if (!shell_command.isEmpty())
     {
         dropMode = false;

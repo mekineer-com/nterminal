@@ -116,8 +116,7 @@ public:
         QFile f(fname);
         if (!f.open(QIODevice::ReadOnly))
         {
-            //qDebug() << "Cannot open file" << fname;
-            // TODO/FIXME: message box
+            qWarning() << "Cannot open bookmarks file:" << fname;
             return;
         }
 
@@ -302,24 +301,6 @@ QModelIndexList BookmarksModel::allChildRows(const QModelIndex& parent) const
     return list;
 }
 
-#if 0
-bool BookmarksModel::setData(const QModelIndex &index, const QVariant &value,
-                             int role)
-{
-    if (role != Qt::EditRole)
-        return false;
-
-    AbstractBookmarkItem *item = getItem(index);
-    bool result = item->setData(index.column(), value);
-
-    if (result)
-        emit dataChanged(index, index);
-
-    return result;
-}
-#endif
-
-
 BookmarksWidget::BookmarksWidget(QWidget *parent)
     : QWidget(parent)
     , m_model(new BookmarksModel(this))
@@ -359,7 +340,7 @@ void BookmarksWidget::handleCommand(const QModelIndex& index)
     if (!item || item->type() != AbstractBookmarkItem::Command)
         return;
 
-    emit callCommand(item->value() + QLatin1Char('\n')); // TODO/FIXME: decide how to handle EOL
+    emit callCommand(item->value() + QLatin1Char('\n'));
 }
 
 void BookmarksWidget::filter(const QString& str)

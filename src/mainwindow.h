@@ -104,7 +104,7 @@ private:
     ComposeInput *m_compose = nullptr;
     QMetaObject::Connection m_composeFocusConnection;
     void setupComposeInput();
-    void syncComposeHostLayout(bool fromWindowResize);
+    void syncComposeHostLayout();
     void reconnectComposeFocusSignal();
 
     bool hasMultipleTabs(QAction *);

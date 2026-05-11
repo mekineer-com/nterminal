@@ -84,7 +84,7 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
     connect(sendEnter, &QShortcut::activated, this, &ComposeInput::send);
 
     updateHeight();
-    onHostLayoutChanged(true);
+    onHostLayoutChanged();
     setRawInputMode(false);
 }
 
@@ -521,12 +521,8 @@ void ComposeInput::transferFromTerminal()
     updateHeight();
 }
 
-void ComposeInput::onHostLayoutChanged(bool fromWindowResize)
+void ComposeInput::onHostLayoutChanged()
 {
-    // Reserved for future baseline-capture split between real window resize
-    // and compose-only layout updates; keep parameter to avoid API churn now.
-    Q_UNUSED(fromWindowResize);
-
     if (m_editor == nullptr)
     {
         return;

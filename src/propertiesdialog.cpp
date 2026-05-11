@@ -362,7 +362,9 @@ void PropertiesDialog::apply()
     Properties::Instance()->savePosOnExit = savePosOnExitCheckBox->isChecked();
     Properties::Instance()->saveSizeOnExit = saveSizeOnExitCheckBox->isChecked();
     Properties::Instance()->saveStateOnExit = saveStateOnExitCheckBox->isChecked();
-    Properties::Instance()->fixedWindowSize = QSize(fixedWithSpinBox->value(), fixedHeightSpinBox->value()).expandedTo(QSize(300, 200)); // FIXME: make Properties variables private and use public methods for setting/getting them
+    Properties::Instance()->fixedWindowSize = QSize(fixedWithSpinBox->value(),
+                                                    fixedHeightSpinBox->value())
+                                                .expandedTo(QSize(300, 200));
     Properties::Instance()->prefDialogSize = size();
 
     Properties::Instance()->useCWD = useCwdCheckBox->isChecked();

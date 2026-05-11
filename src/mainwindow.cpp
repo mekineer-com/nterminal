@@ -205,16 +205,16 @@ void MainWindow::setupComposeInput()
     addAction(toggle);
 
     reconnectComposeFocusSignal();
-    syncComposeHostLayout(true);
+    syncComposeHostLayout();
 }
 
-void MainWindow::syncComposeHostLayout(bool fromWindowResize)
+void MainWindow::syncComposeHostLayout()
 {
     if (m_compose == nullptr || !m_compose->isActive())
     {
         return;
     }
-    m_compose->onHostLayoutChanged(fromWindowResize);
+    m_compose->onHostLayoutChanged();
 }
 
 void MainWindow::reconnectComposeFocusSignal()
@@ -233,7 +233,7 @@ void MainWindow::reconnectComposeFocusSignal()
     }
 
     m_composeFocusConnection = connect(holder, &TermWidgetHolder::termFocusChanged, this, [this]() {
-        syncComposeHostLayout(false);
+        syncComposeHostLayout();
     });
 }
 
@@ -432,24 +432,6 @@ void MainWindow::setup_ActionsMenu_Actions()
 
     setup_Action(HANDLE_HISTORY, new QAction(QIcon::fromTheme(QStringLiteral("handle-history")), tr("Handle history..."), settingOwner),
                  NULL, this, SLOT(handleHistory()), menu_Actions);
-
-#if 0
-    act = new QAction(this);
-    act->setSeparator(true);
-
-    // TODO/FIXME: unimplemented for now
-    act = new QAction(tr("&Save Session"), this);
-    // do not use sequences for this task - it collides with eg. mc shortcuts
-    // and mainly - it's not used too often
-    //act->setShortcut(QKeySequence::Save);
-    connect(act, SIGNAL(triggered()), consoleTabulator, SLOT(saveSession()));
-
-    act = new QAction(tr("&Load Session"), this);
-    // do not use sequences for this task - it collides with eg. mc shortcuts
-    // and mainly - it's not used too often
-    //act->setShortcut(QKeySequence::Open);
-    connect(act, SIGNAL(triggered()), consoleTabulator, SLOT(loadSession()));
-#endif
 
     setup_Action(TOGGLE_MENU, new QAction(tr("&Toggle Menu"), settingOwner),
                  TOGGLE_MENU_SHORTCUT, this, SLOT(toggleMenu()));
@@ -651,7 +633,8 @@ void MainWindow::setupCustomDirs()
     for (const QString& dir : std::as_const(dirs)) {
         TermWidgetImpl::addCustomColorSchemeDir(dir + QLatin1String("/color-schemes"));
     }
-    // FIXME: To be deprecated and then removed
+    // Legacy fallback: keep the profile-adjacent color-schemes path to
+    // preserve compatibility with existing user setups.
     const QSettings settings;
     const QString dir = QFileInfo(settings.fileName()).canonicalPath() + QLatin1String("/color-schemes");
     TermWidgetImpl::addCustomColorSchemeDir(dir);
@@ -660,7 +643,7 @@ void MainWindow::setupCustomDirs()
 void MainWindow::on_consoleTabulator_currentChanged(int)
 {
     reconnectComposeFocusSignal();
-    syncComposeHostLayout(false);
+    syncComposeHostLayout();
 }
 
 void MainWindow::toggleTabBar()
@@ -978,7 +961,7 @@ bool MainWindow::event(QEvent *event)
 {
     if (event->type() == QEvent::Show || event->type() == QEvent::Hide)
     {
-        syncComposeHostLayout(false);
+        syncComposeHostLayout();
     }
 
     if (event->type() == QEvent::WindowDeactivate)
@@ -1031,7 +1014,7 @@ bool MainWindow::event(QEvent *event)
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    syncComposeHostLayout(true);
+    syncComposeHostLayout();
 }
 
 void MainWindow::showEvent(QShowEvent* event)
@@ -1044,7 +1027,7 @@ void MainWindow::showEvent(QShowEvent* event)
         m_layerWindow->setMargins(QMargins(hMargin, 0, hMargin, vMargin));
     }
     QMainWindow::showEvent(event);
-    syncComposeHostLayout(false);
+    syncComposeHostLayout();
 }
 
 void MainWindow::newTerminalWindow()

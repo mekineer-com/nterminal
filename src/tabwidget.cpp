@@ -342,16 +342,6 @@ void TabWidget::setTitleColor(int index)
         tabBar()->setTabTextColor(index, color);
 }
 
-void TabWidget::renameTabsAfterRemove()
-{
-// it breaks custom names - it replaces original/custom title with shell no #
-#if 0
-    for(int i = 0; i < count(); i++) {
-        setTabText(i, QString(tr("Shell No. %1")).arg(i+1));
-    }
-#endif
-}
-
 void TabWidget::contextMenuEvent(QContextMenuEvent *event)
 {
     int tabIndex = tabBar()->tabAt(tabBar()->mapFrom(this, event->pos()));
@@ -383,7 +373,6 @@ void TabWidget::contextMenuEvent(QContextMenuEvent *event)
 
 bool TabWidget::eventFilter(QObject *obj, QEvent *event)
 {
-    Q_UNUSED(obj)
     if (event->type() == QEvent::MouseButtonRelease)
     {
         auto *e = static_cast<QMouseEvent*>(event);
@@ -481,14 +470,12 @@ void TabWidget::removeTab(int index, bool prompt)
             if (auto *holder = qobject_cast<TermWidgetHolder*>(widget(current)))
                 holder->setInitialFocus();
         }
-    // do not decrease it as renaming is disabled in renameTabsAfterRemove
-    //    tabNumerator--;
+    // Keep numbering monotonic so user-renamed tabs are never rewritten.
         setUpdatesEnabled(true);
     } else {
         emit closeLastTabNotification();
     }
 
-    renameTabsAfterRemove();
     showHideTabBar();
 }
 
