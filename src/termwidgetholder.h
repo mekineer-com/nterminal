@@ -56,9 +56,6 @@ class TermWidgetHolder : public QWidget
 
         void propertiesChanged();
         void setInitialFocus();
-
-        void loadSession();
-        void saveSession(const QString & name);
         void zoomIn(uint step);
         void zoomOut(uint step);
 
@@ -105,4 +102,3 @@ class TermWidgetHolder : public QWidget
 };
 
 #endif
-

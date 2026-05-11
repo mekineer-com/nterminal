@@ -18,7 +18,6 @@
 
 #include <QGridLayout>
 #include <QSplitter>
-#include <QInputDialog>
 
 #ifdef HAVE_QDBUS
     #include <QtDBus/QtDBus>
@@ -29,7 +28,6 @@
 #include "mainwindow.h"
 #include "termwidgetholder.h"
 #include "termwidget.h"
-#include "properties.h"
 #include <cassert>
 #include <climits>
 #include <algorithm>
@@ -69,36 +67,6 @@ void TermWidgetHolder::setInitialFocus()
     TermWidget * w = list.count() == 0 ? 0 : list.at(0);
     if (w)
         w->setFocus(Qt::OtherFocusReason);
-}
-
-void TermWidgetHolder::loadSession()
-{
-    bool ok = false;
-    QString name = QInputDialog::getItem(this, tr("Load Session"),
-                                         tr("List of saved sessions:"),
-                                         Properties::Instance()->sessions.keys(),
-                                         0, false, &ok);
-    if (!ok || name.isEmpty())
-        return;
-
-    Q_UNUSED(name);
-    qWarning() << "Load Session is currently unavailable.";
-}
-
-void TermWidgetHolder::saveSession(const QString & name)
-{
-    Session dump;
-    QString num(QLatin1String("%1"));
-    const auto ws = findChildren<QSplitter*>();
-    for(QSplitter *w : ws)
-    {
-        dump += QLatin1Char('|') + num.arg(w->orientation());
-        const auto sizes = w->sizes();
-        for (const int i : sizes)
-            dump += QLatin1Char(',') + num.arg(i);
-    }
-    Properties::Instance()->sessions[name] = dump;
-    qDebug() << "dump" << dump;
 }
 
 TermWidget* TermWidgetHolder::currentTerminal()

@@ -90,9 +90,6 @@ public slots:
 
     void clearActiveTerminal();
 
-    void saveSession();
-    void loadSession();
-
     void preset2Horizontal();
     void preset2Vertical();
     void preset4Terminals();
@@ -114,7 +111,7 @@ protected:
         It's purpose is to handle doubleclicks on QTabBar for session
         renaming or new tab opening
      */
-    bool eventFilter(QObject *obj, QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 protected slots:
     void updateTabIndices();
     void onTermTitleChanged(const QString& title, const QString& icon);

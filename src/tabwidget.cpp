@@ -371,7 +371,7 @@ void TabWidget::contextMenuEvent(QContextMenuEvent *event)
     }
 }
 
-bool TabWidget::eventFilter(QObject *obj, QEvent *event)
+bool TabWidget::eventFilter(QObject *watched, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonRelease)
     {
@@ -417,7 +417,7 @@ bool TabWidget::eventFilter(QObject *obj, QEvent *event)
             renameSession(index);
         return true;
     }
-    return QTabWidget::eventFilter(obj, event);
+    return QTabWidget::eventFilter(watched, event);
 }
 
 void TabWidget::removeFinished()
@@ -656,19 +656,6 @@ void TabWidget::clearActiveTerminal()
 {
     if (auto *holder = terminalHolder())
         holder->clearActiveTerminal();
-}
-
-void TabWidget::saveSession()
-{
-    int ix = currentIndex();
-    if (auto *holder = qobject_cast<TermWidgetHolder*>(widget(ix)))
-        holder->saveSession(tabText(ix));
-}
-
-void TabWidget::loadSession()
-{
-    if (auto *holder = terminalHolder())
-        holder->loadSession();
 }
 
 void TabWidget::preset2Horizontal()
