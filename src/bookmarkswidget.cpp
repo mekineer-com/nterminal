@@ -192,10 +192,10 @@ BookmarksModel::BookmarksModel(QObject *parent)
 
 void BookmarksModel::setup()
 {
+    beginResetModel();
     delete m_root;
     m_root = new BookmarkRootItem();
     m_root->addChild(new BookmarkFileGroupItem(m_root, Properties::Instance()->bookmarksFile));
-    beginResetModel();
     endResetModel();
 }
 

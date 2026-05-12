@@ -381,11 +381,11 @@ void ComposeInput::send()
         constexpr int kClaudeAfterClearDelayMs = 150;
         constexpr int kClaudeSubmitAfterTextDelayMs = 120;
 
-        QTimer::singleShot(kClaudeAfterClearDelayMs, this, [text, target, finish]() {
+        QTimer::singleShot(kClaudeAfterClearDelayMs, this, [this, text, target, finish]() {
             TermWidgetImpl *i = target.data();
             if (i == nullptr) { finish(); return; }
             i->sendText(text);
-            QTimer::singleShot(kClaudeSubmitAfterTextDelayMs, i, [target, finish]() {
+            QTimer::singleShot(kClaudeSubmitAfterTextDelayMs, this, [target, finish]() {
                 TermWidgetImpl *i2 = target.data();
                 if (i2 != nullptr) i2->sendText(QString(QLatin1Char('\r')));
                 finish();
@@ -395,15 +395,15 @@ void ComposeInput::send()
     else if (cli == Cli::Gemini)
     {
         // 200ms for clear to settle, then '?' fires help menu (dc11ca6).
-        QTimer::singleShot(200, this, [text, target, finish]() {
+        QTimer::singleShot(200, this, [this, text, target, finish]() {
             TermWidgetImpl *i = target.data();
             if (i == nullptr) { finish(); return; }
             i->sendText(QStringLiteral("?"));
-            QTimer::singleShot(100, i, [text, target, finish]() {
+            QTimer::singleShot(100, this, [this, text, target, finish]() {
                 TermWidgetImpl *i2 = target.data();
                 if (i2 == nullptr) { finish(); return; }
                 i2->sendText(text);
-                QTimer::singleShot(200, i2, [target, finish]() {
+                QTimer::singleShot(200, this, [this, target, finish]() {
                     TermWidgetImpl *i3 = target.data();
                     if (i3 != nullptr) i3->sendText(QString(QLatin1Char('\r')));
                     finish();
