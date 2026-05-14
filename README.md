@@ -35,6 +35,20 @@ Enable compose mode at launch with `NTERMINAL_COMPOSE=1`.
 - Auto-grow limit: 12 lines by default (`NTERMINAL_COMPOSE_MAX_LINES` to override).
 - Raw input toggle: `F6` (hide editor and type directly into terminal).
 
+### Editor Reflex Safety (`Ctrl+Z`)
+
+If you are used to editor shortcuts, `Ctrl+Z` in a terminal can suspend the app by mistake.  
+Remap terminal control keys in your shell startup files (for example `~/.profile` and `~/.bashrc`):
+
+```sh
+stty intr ^X
+stty susp ^]
+```
+
+- `Ctrl+X` becomes interrupt (`SIGINT`) instead of `Ctrl+C`.
+- `Ctrl+]` becomes suspend (`SIGTSTP`) instead of `Ctrl+Z`.
+- Open a new terminal tab/window after changing these lines.
+
 ## Shortcuts
 
 | Shortcut | Action |
