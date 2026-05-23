@@ -11,7 +11,6 @@
 #include <QFile>
 #include <QPointer>
 #include <QScrollBar>
-#include <QAbstractTextDocumentLayout>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -123,16 +122,14 @@ void ComposeInput::updateHeight()
     const int frame = m_editor->frameWidth() * 2;
     const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
 
-    // Use true wrapped-content height in pixels. This avoids line-count drift
-    // when a long logical line wraps across multiple visual rows.
-    const qreal docHeightPx = m_editor->document()->documentLayout()->documentSize().height();
-    const int contentHeight = std::max(lineHeight, static_cast<int>(std::ceil(docHeightPx)));
+    // QPlainTextEdit reports wrap-aware visual line height here.
+    const qreal docVisualLines = m_editor->document()->size().height();
+    int visualLines = std::max(1, static_cast<int>(std::ceil(docVisualLines)));
+    visualLines = std::min(visualLines, maxLines);
 
-    const int maxContentHeight = (maxLines * lineHeight) + (docMargin * 2);
-    const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
-
+    const int contentHeight = (visualLines * lineHeight) + (docMargin * 2);
     const int oneLineHeight = frame + lineHeight + (docMargin * 2);
-    const int newHeight = frame + clampedContentHeight;
+    const int newHeight = frame + contentHeight;
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
