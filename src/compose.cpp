@@ -10,6 +10,8 @@
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
+#include <QScrollBar>
+#include <QAbstractTextDocumentLayout>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -116,20 +118,38 @@ void ComposeInput::updateHeight()
         maxLines = 12;
     }
 
-    const qreal docHeight = m_editor->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
-    visualLines = std::min(visualLines, maxLines);
-
     const QFontMetrics fm(m_editor->font());
-    const int padding = 8;
+    const int lineHeight = fm.lineSpacing();
     const int frame = m_editor->frameWidth() * 2;
-    const int oneLineHeight = frame + padding + fm.lineSpacing();
-    const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
+    const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
+
+    // Use true wrapped-content height in pixels. This avoids line-count drift
+    // when a long logical line wraps across multiple visual rows.
+    const qreal docHeightPx = m_editor->document()->documentLayout()->documentSize().height();
+    const int contentHeight = std::max(lineHeight, static_cast<int>(std::ceil(docHeightPx)));
+
+    const int maxContentHeight = (maxLines * lineHeight) + (docMargin * 2);
+    const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
+
+    const int oneLineHeight = frame + lineHeight + (docMargin * 2);
+    const int newHeight = frame + clampedContentHeight;
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
     m_editorBaselineHeight = oneLineHeight;
     m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
+
+    // Keep cursor/view sync immediately after growth; this prevents a transient
+    // phantom line at the bottom until the user moves the cursor.
+    m_editor->ensureCursorVisible();
+    if (QScrollBar *vsb = m_editor->verticalScrollBar())
+    {
+        if (vsb->value() > vsb->maximum())
+        {
+            vsb->setValue(vsb->maximum());
+        }
+    }
+
     positionComposeEditor();
     applyCurrentTerminalOffset();
 }
