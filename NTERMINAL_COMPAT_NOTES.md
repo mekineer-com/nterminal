@@ -1,6 +1,6 @@
 # NTerminal Compatibility Notes
 
-Last updated: 2026-05-01
+Last updated: 2026-05-23
 
 Audience: maintainers and contributors. This is the technical companion to `README.md` (which is the quick operator guide).
 
@@ -77,7 +77,38 @@ Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when buil
 - `documentMargin(2)` for left/right padding (prevents first-character clipping).
 - Unlimited scrollback history in compose mode (benefits Codex/Gemini long sessions; Claude Code clears its own scrollback).
 - Height auto-grows up to `NTERMINAL_COMPOSE_MAX_LINES` (default 12).
-- `QTimer::singleShot(0)` deferred height update so document layout runs before size query.
+
+### Wrapped-line height sync (compose.cpp)
+The compose wrapped-line bug family is timing + geometry sensitive.
+
+Current stabilization stack (must stay together):
+1. **Signal source** — listen to `QAbstractTextDocumentLayout::documentSizeChanged` (not `QTextDocument::contentsChanged`).
+2. **Dispatch** — queue `updateHeight()` via `QMetaObject::invokeMethod(..., Qt::QueuedConnection)` so sizing runs after layout settles.
+3. **Metric** — count visual rows from `block.layout()->lineCount()` per block instead of relying on transient `document()->size().height()`.
+4. **Viewport state** — when under `maxLines`, keep internal editor scroll pinned to top to avoid hidden top row + phantom row states.
+5. **Margin accounting** — include `documentMargin()` in computed editor height.
+
+Applied commits in this area:
+- `124dee8` signal source
+- `bf24a80` queued dispatch
+- `db2bca8` per-block visual-line metric
+- `ee47021` scroll pin below cap
+- `7f7738d` margin accounting
+
+Known remaining edge case:
+- A narrow cap-boundary issue can still appear at exactly the 12th visual row in some wrapped-content sequences.
+- Symptom: transient phantom row that can self-heal after full scroll traversal.
+
+Most likely root cause (for future no-clamp fix):
+- **Unit mismatch at cap boundary**: row-count logic (`lineCount`/`lineSpacing`) does not always match actual QTextLayout pixel box extents for wrapped lines.
+- This can leave a small bottom-row pixel deficit at exactly `maxLines`, which manifests as a phantom row.
+
+Recommended future root fix (when doing deeper work):
+1. Keep block-based row counting only for cap decisions.
+2. Compute final editor height from real block pixel geometry (top/bottom span from layout), not `lineSpacing * rows`.
+3. Remove magic vertical constants from row math and use one explicit inset model.
+4. Validate against these repros: first wrapped paste, wrapped+short-line paste, entering exactly line 12, and post-scroll stability.
+
 
 ## Selection and Transfer
 
