@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QTextOption>
 #include <QTextDocument>
+#include <QTextBlock>
+#include <QAbstractTextDocumentLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QRegularExpression>
@@ -121,38 +123,37 @@ void ComposeInput::updateHeight()
     const int lineHeight = fm.lineSpacing();
     const int frame = m_editor->frameWidth() * 2;
     const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
+    const int maxContentHeight = (maxLines * lineHeight) + (docMargin * 2);
 
-    // QPlainTextEdit reports wrap-aware visual line height here.
-    const qreal docVisualLines = m_editor->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::ceil(docVisualLines)));
-    visualLines = std::min(visualLines, maxLines);
+    // Measure wrapped content using block geometry rather than document line
+    // estimates. This avoids off-by-one drift that produced phantom rows.
+    qreal contentBottomPx = 0.0;
+    for (QTextBlock block = m_editor->document()->begin(); block.isValid(); block = block.next())
+    {
+        const QRectF blockRect = m_editor->document()->documentLayout()->blockBoundingRect(block);
+        contentBottomPx = std::max(contentBottomPx, blockRect.bottom());
+    }
 
-    const int contentHeight = (visualLines * lineHeight) + (docMargin * 2);
+    const int contentHeight = std::max(
+        lineHeight + (docMargin * 2),
+        static_cast<int>(std::ceil(contentBottomPx)) + (docMargin * 2)
+    );
+    const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
     const int oneLineHeight = frame + lineHeight + (docMargin * 2);
-    const int newHeight = frame + contentHeight;
+    const int newHeight = frame + clampedContentHeight;
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
     m_editorBaselineHeight = oneLineHeight;
     m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
 
-    // Keep cursor/view sync immediately after growth.
-    // When content is under the compose cap, force zero internal scrolling so
-    // wrapped-line Enter cannot hide the top line or create a phantom bottom row.
+    // Keep cursor/view sync after height changes.
+    m_editor->ensureCursorVisible();
     if (QScrollBar *vsb = m_editor->verticalScrollBar())
     {
-        const bool atCap = (visualLines >= maxLines);
-        if (!atCap)
+        if (vsb->value() > vsb->maximum())
         {
-            vsb->setValue(vsb->minimum());
-        }
-        else
-        {
-            m_editor->ensureCursorVisible();
-            if (vsb->value() > vsb->maximum())
-            {
-                vsb->setValue(vsb->maximum());
-            }
+            vsb->setValue(vsb->maximum());
         }
     }
 
