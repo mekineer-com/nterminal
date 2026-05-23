@@ -124,6 +124,7 @@ Current stabilization stack (keep together):
 
 Known edge case still seen sometimes:
 - At exactly the cap boundary (line 12 default), a transient phantom row can appear in narrow wrapped-content sequences.
+- This is most visible at exactly line 12 (not line 11 and not line 13), which points to a cap-boundary unit mismatch instead of a general wrapping bug.
 
 Likely root cause:
 - Row-count units and pixel geometry are still not perfectly aligned at the cap boundary.
@@ -131,6 +132,7 @@ Likely root cause:
 Future root-fix direction:
 - Keep row counts only for cap decisions.
 - Compute final height from actual layout pixel extents.
+- Remove magic vertical constants (for example fixed padding values) from row math and apply measured insets in one place.
 
 ## Known Limitations
 
