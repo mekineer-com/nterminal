@@ -8,6 +8,7 @@
 #include <QAbstractTextDocumentLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QScrollBar>
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
@@ -134,6 +135,26 @@ void ComposeInput::updateHeight()
     m_editorHeight = newHeight;
     m_editorBaselineHeight = oneLineHeight;
     m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
+
+    // If all visual rows fit under the compose cap, there should be no
+    // internal editor scroll. Keep it pinned to the top so first wrapped rows
+    // do not get hidden after a paste-triggered reflow.
+    if (QScrollBar *vsb = m_editor->verticalScrollBar())
+    {
+        if (visualLines < maxLines)
+        {
+            vsb->setValue(vsb->minimum());
+        }
+        else
+        {
+            m_editor->ensureCursorVisible();
+            if (vsb->value() > vsb->maximum())
+            {
+                vsb->setValue(vsb->maximum());
+            }
+        }
+    }
+
     positionComposeEditor();
     applyCurrentTerminalOffset();
 }
