@@ -127,16 +127,21 @@ void ComposeInput::updateHeight()
 
     // Measure wrapped content using block geometry rather than document line
     // estimates. This avoids off-by-one drift that produced phantom rows.
+    qreal contentTopPx = std::numeric_limits<qreal>::max();
     qreal contentBottomPx = 0.0;
+    bool sawBlock = false;
     for (QTextBlock block = m_editor->document()->begin(); block.isValid(); block = block.next())
     {
         const QRectF blockRect = m_editor->document()->documentLayout()->blockBoundingRect(block);
+        contentTopPx = std::min(contentTopPx, blockRect.top());
         contentBottomPx = std::max(contentBottomPx, blockRect.bottom());
+        sawBlock = true;
     }
+    const qreal contentSpanPx = sawBlock ? std::max<qreal>(0.0, contentBottomPx - contentTopPx) : static_cast<qreal>(lineHeight);
 
     const int contentHeight = std::max(
         lineHeight + (docMargin * 2),
-        static_cast<int>(std::ceil(contentBottomPx)) + (docMargin * 2)
+        static_cast<int>(std::ceil(contentSpanPx)) + (docMargin * 2)
     );
     const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
     const int oneLineHeight = frame + lineHeight + (docMargin * 2);
