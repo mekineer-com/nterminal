@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QTextOption>
 #include <QTextDocument>
+#include <QAbstractTextDocumentLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QRegularExpression>
@@ -72,9 +73,12 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
 
     m_editor->viewport()->installEventFilter(this);
 
-    connect(m_editor->document(), &QTextDocument::contentsChanged, this, [this]() {
-        QTimer::singleShot(0, this, &ComposeInput::updateHeight);
-    });
+    if (QAbstractTextDocumentLayout *layout = m_editor->document()->documentLayout())
+    {
+        connect(layout, &QAbstractTextDocumentLayout::documentSizeChanged, this, [this](const QSizeF &) {
+            updateHeight();
+        });
+    }
 
     auto *sendReturn = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Return), m_editor);
     sendReturn->setContext(Qt::WidgetWithChildrenShortcut);
