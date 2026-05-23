@@ -63,15 +63,22 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
     m_editor = new QPlainTextEdit(container);
     m_editor->setObjectName(QStringLiteral("composeInput"));
     m_editor->setFrameShape(QFrame::NoFrame);
+    m_editor->setFrameShadow(QFrame::Plain);
+    m_editor->setLineWidth(0);
+    m_editor->setMidLineWidth(0);
     m_editor->setTabChangesFocus(false);
     m_editor->setUndoRedoEnabled(true);
     m_editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_editor->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_editor->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_editor->document()->setDocumentMargin(2);
+    m_editor->document()->setDocumentMargin(0);
     m_editor->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
-    m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
+    m_editor->setStyleSheet(QStringLiteral(
+        "QPlainTextEdit#composeInput { "
+        "border: 0; margin: 0; padding: 0; "
+        "}"
+    ));
 
     m_editor->viewport()->installEventFilter(this);
 
@@ -121,31 +128,16 @@ void ComposeInput::updateHeight()
 
     const QFontMetrics fm(m_editor->font());
     const int lineHeight = fm.lineSpacing();
-    const int frame = m_editor->frameWidth() * 2;
-    const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
-    const int maxContentHeight = (maxLines * lineHeight) + (docMargin * 2);
+    // Keep sizing tied to the known-good wrap-aware metric; the phantom row was
+    // style chrome drift, so we force chrome to zero above instead of changing
+    // the line metric path.
+    const qreal docVisualLines = m_editor->document()->size().height();
+    int visualLines = std::max(1, static_cast<int>(std::floor(docVisualLines + 1e-6)));
+    visualLines = std::min(visualLines, maxLines);
 
-    // Measure wrapped content using block geometry rather than document line
-    // estimates. This avoids off-by-one drift that produced phantom rows.
-    qreal contentTopPx = std::numeric_limits<qreal>::max();
-    qreal contentBottomPx = 0.0;
-    bool sawBlock = false;
-    for (QTextBlock block = m_editor->document()->begin(); block.isValid(); block = block.next())
-    {
-        const QRectF blockRect = m_editor->document()->documentLayout()->blockBoundingRect(block);
-        contentTopPx = std::min(contentTopPx, blockRect.top());
-        contentBottomPx = std::max(contentBottomPx, blockRect.bottom());
-        sawBlock = true;
-    }
-    const qreal contentSpanPx = sawBlock ? std::max<qreal>(0.0, contentBottomPx - contentTopPx) : static_cast<qreal>(lineHeight);
-
-    const int contentHeight = std::max(
-        lineHeight + (docMargin * 2),
-        static_cast<int>(std::ceil(contentSpanPx)) + (docMargin * 2)
-    );
-    const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
-    const int oneLineHeight = frame + lineHeight + (docMargin * 2);
-    const int newHeight = frame + clampedContentHeight;
+    const int verticalInset = 2;
+    const int oneLineHeight = (lineHeight) + verticalInset;
+    const int newHeight = (visualLines * lineHeight) + verticalInset;
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
