@@ -21,14 +21,14 @@ Fork of qterminal with a compose editor for AI CLIs (Claude Code, Codex, Gemini)
 
 **Terminal improvements**:
 - Unlimited scrollback history (benefits Codex and Gemini; Claude Code clears its own).
-- Debounced resize — layout changes from the compose editor produce one clean terminal redraw instead of many.
+- Coalesced resize scheduling — rapid layout changes are merged into a single next-tick terminal size update.
 - Bottom-anchored scroll — terminal stays at bottom when shrinking (upstream PR: lxqt/qtermwidget#638).
 
 ## Compatibility Matrix
 
 | CLI | Replace Prompt | Preserve `?` | Submit | Notes |
 |-----|----------------|--------------|--------|-------|
-| Claude Code | Yes | Yes | Yes | Clear: Ctrl+U. Submit: 200ms delays. Transfer: bracketed paste. |
+| Claude Code | Yes | Yes | Yes | Clear: Ctrl+U. Submit: 150ms/120ms delays. Transfer: bracketed paste. |
 | Codex CLI | Yes | Yes | Yes | Clear: Ctrl+K + Ctrl+U x8. Submit: Enter key after 100ms. |
 | Gemini CLI | Yes | Yes | Yes | Clear: Down x8 + Ctrl+E + Ctrl+U x8. `?` primer trick on both paths. |
 | bash/ash/zsh | Yes | Yes | Yes | Clear: Ctrl+K + Ctrl+U x8. Submit: `\r` after 100ms (not Key_Return). |
@@ -43,7 +43,7 @@ CLI detection: reads `/proc/<pid>/cmdline` for foreground and shell processes. M
 
 | CLI | Step 1 | Wait | Step 2 | Wait | Step 3 |
 |-----|--------|------|--------|------|--------|
-| Claude | Ctrl+U | 200ms | text | 200ms | `\r` |
+| Claude | Ctrl+U | 150ms | text | 120ms | `\r` |
 | Gemini | `?` | 100ms | text | 200ms | `\r` |
 | Codex | text | 100ms | Key_Return | — | — |
 | Unknown | text | 100ms | `\r` | — | — |
@@ -58,11 +58,11 @@ Upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638
 ### Bottom-anchored scroll (Screen.cpp, ScreenWindow.cpp, Emulation.cpp)
 `Screen::resizeImage()` pushes lines to history when terminal shrinks, but `ScreenWindow::_currentLine` wasn't adjusted in the non-tracking path → viewport jumped to top. Fix: `_resizePushedLines` counter, accumulated across batched resizes, reset in `showBulk()`.
 
-### Debounced resize (Session.cpp)
-`Session::onViewSizeChange()` debounces `updateTerminalSize()` through a 150ms single-shot timer. Compose editor height changes and search bar toggling trigger many rapid layout events; the debounce coalesces them into one SIGWINCH at the correct final size. Replaced earlier suppress approach (`setSuppressPtyResize`) which caused status line disappearing and cursor OOB crashes without fixing the duplication.
+### Coalesced resize scheduling (Session.cpp)
+`Session::onViewSizeChange()` coalesces repeated resize callbacks by scheduling one `updateTerminalSize()` on the next event-loop tick. This keeps resize behavior deterministic while avoiding re-entrant resize churn from compose/search-bar layout updates. Replaced earlier suppress approach (`setSuppressPtyResize`) which caused status line disappearing and cursor OOB crashes without fixing duplication.
 
 ### Cursor position clamping (TerminalDisplay.cpp)
-`cursorPosition()` clamps Y to `_lines-1` and X to `_columns-1`. Safety net for transient size mismatches during resize debounce window. `updateImage()` also early-returns if windowLines/windowColumns are zero.
+`cursorPosition()` clamps Y to `_lines-1` and X to `_columns-1`. Safety net for transient size mismatches during resize/update coalescing. `updateImage()` also early-returns if windowLines/windowColumns are zero.
 
 ### CMAKE_CURRENT_BINARY_DIR fix (CMakeLists.txt)
 Generated `qtermwidget_version.h` used `CMAKE_BINARY_DIR` which breaks when built as `add_subdirectory()`. Changed to `CMAKE_CURRENT_BINARY_DIR`.
@@ -130,7 +130,7 @@ In `tui: fullscreen`, plain drag creates visual highlight but Screen repaints cl
 
 ## Known Limitations
 
-- **Window resize** (user drags edge): debounced to one SIGWINCH after layout settles. TUI app still redraws once; history duplication possible but reduced vs pre-debounce.
+- **Window resize** (user drags edge): callbacks are coalesced to next tick. TUI app still redraws once; history duplication possible but reduced vs immediate per-callback resizing.
 - **Claude Code scrollback**: Claude clears its own scrollback (ESC[3J). Unlimited history in nterminal doesn't help Claude specifically. Benefits Codex and Gemini.
 - **Gemini `?` timing**: 100ms delay between primer and text is empirical. May need adjustment on slower systems.
 
