@@ -5,14 +5,13 @@
 #include <QTimer>
 #include <QTextOption>
 #include <QTextDocument>
-#include <QTextBlock>
-#include <QAbstractTextDocumentLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
 #include <QScrollBar>
+#include <QAbstractTextDocumentLayout>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -63,22 +62,15 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
     m_editor = new QPlainTextEdit(container);
     m_editor->setObjectName(QStringLiteral("composeInput"));
     m_editor->setFrameShape(QFrame::NoFrame);
-    m_editor->setFrameShadow(QFrame::Plain);
-    m_editor->setLineWidth(0);
-    m_editor->setMidLineWidth(0);
     m_editor->setTabChangesFocus(false);
     m_editor->setUndoRedoEnabled(true);
     m_editor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_editor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_editor->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     m_editor->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    m_editor->document()->setDocumentMargin(0);
+    m_editor->document()->setDocumentMargin(2);
     m_editor->setPlaceholderText(tr("Compose: Enter newline, Ctrl+Enter send, F6 raw mode"));
-    m_editor->setStyleSheet(QStringLiteral(
-        "QPlainTextEdit#composeInput { "
-        "border: 0; margin: 0; padding: 0; "
-        "}"
-    ));
+    m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
     m_editor->viewport()->installEventFilter(this);
 
@@ -128,23 +120,27 @@ void ComposeInput::updateHeight()
 
     const QFontMetrics fm(m_editor->font());
     const int lineHeight = fm.lineSpacing();
-    // Keep sizing tied to the known-good wrap-aware metric; the phantom row was
-    // style chrome drift, so we force chrome to zero above instead of changing
-    // the line metric path.
-    const qreal docVisualLines = m_editor->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::floor(docVisualLines + 1e-6)));
-    visualLines = std::min(visualLines, maxLines);
+    const int frame = m_editor->frameWidth() * 2;
+    const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
 
-    const int verticalInset = 2;
-    const int oneLineHeight = (lineHeight) + verticalInset;
-    const int newHeight = (visualLines * lineHeight) + verticalInset;
+    // Use true wrapped-content height in pixels. This avoids line-count drift
+    // when a long logical line wraps across multiple visual rows.
+    const qreal docHeightPx = m_editor->document()->documentLayout()->documentSize().height();
+    const int contentHeight = std::max(lineHeight, static_cast<int>(std::ceil(docHeightPx)));
+
+    const int maxContentHeight = (maxLines * lineHeight) + (docMargin * 2);
+    const int clampedContentHeight = std::min(contentHeight, maxContentHeight);
+
+    const int oneLineHeight = frame + lineHeight + (docMargin * 2);
+    const int newHeight = frame + clampedContentHeight;
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
     m_editorBaselineHeight = oneLineHeight;
     m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
 
-    // Keep cursor/view sync after height changes.
+    // Keep cursor/view sync immediately after growth; this prevents a transient
+    // phantom line at the bottom until the user moves the cursor.
     m_editor->ensureCursorVisible();
     if (QScrollBar *vsb = m_editor->verticalScrollBar())
     {
