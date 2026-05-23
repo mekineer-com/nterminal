@@ -9,6 +9,7 @@
 #include <QTextBlock>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QMetaObject>
 #include <QScrollBar>
 #include <QRegularExpression>
 #include <QFile>
@@ -78,7 +79,7 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
     if (QAbstractTextDocumentLayout *layout = m_editor->document()->documentLayout())
     {
         connect(layout, &QAbstractTextDocumentLayout::documentSizeChanged, this, [this](const QSizeF &) {
-            updateHeight();
+            QMetaObject::invokeMethod(this, &ComposeInput::updateHeight, Qt::QueuedConnection);
         });
     }
 
@@ -550,7 +551,7 @@ void ComposeInput::transferFromTerminal()
     setRawInputMode(false);
     m_editor->setFocus(Qt::OtherFocusReason);
     m_editor->insertPlainText(normalized);
-    updateHeight();
+    QMetaObject::invokeMethod(this, &ComposeInput::updateHeight, Qt::QueuedConnection);
 }
 
 void ComposeInput::onHostLayoutChanged()
