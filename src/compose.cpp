@@ -157,11 +157,11 @@ void ComposeInput::updateHeight()
         }
         else
         {
+            // At the cap, always anchor to the bottom. A partial scroll state
+            // here can manifest as a transient "phantom" row on the 12th line.
+            vsb->setValue(vsb->maximum());
             m_editor->ensureCursorVisible();
-            if (vsb->value() > vsb->maximum())
-            {
-                vsb->setValue(vsb->maximum());
-            }
+            vsb->setValue(vsb->maximum());
         }
     }
 
