@@ -2,7 +2,11 @@
 
 NTerminal is a QTerminal fork that adds a compose editor for drafting multi-line input before sending it to terminal apps. It is tuned for Claude Code, Codex CLI, Gemini CLI, and plain shells.
 
-This README is the quick operator guide. For implementation details and edge-case behavior, see [NTERMINAL_COMPAT_NOTES.md](NTERMINAL_COMPAT_NOTES.md).
+This README is the quick operator guide. For implementation details, design rationale, and edge-case behavior, see [NTERMINAL_MAINTAINER_NOTES.md](NTERMINAL_MAINTAINER_NOTES.md).
+
+Who should read what:
+- `README.md` (this file): how to install, run, and use compose mode.
+- `NTERMINAL_MAINTAINER_NOTES.md`: why behavior is implemented this way and where to patch safely.
 
 ## Quick Start
 
