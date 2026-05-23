@@ -123,29 +123,21 @@ void ComposeInput::updateHeight()
         maxLines = 12;
     }
 
+    int visualLines = 0;
+    for (QTextBlock block = m_editor->document()->begin(); block.isValid(); block = block.next())
+    {
+        const QTextLayout *layout = block.layout();
+        const int blockLines = (layout != nullptr) ? layout->lineCount() : 0;
+        visualLines += std::max(1, blockLines);
+    }
+    visualLines = std::max(1, visualLines);
+    visualLines = std::min(visualLines, maxLines);
+
     const QFontMetrics fm(m_editor->font());
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
-    const int lineHeight = fm.lineSpacing();
-
-    // Pixel-accurate wrapped content height avoids clipped bottom rows.
-    const qreal docHeightPx = m_editor->document()->documentLayout()->documentSize().height();
-    const int minContentPx = lineHeight;
-    const int maxContentPx = maxLines * lineHeight;
-    const int clampedContentPx = std::clamp(
-        static_cast<int>(std::ceil(docHeightPx)),
-        minContentPx,
-        maxContentPx
-    );
-
-    const int visualLines = std::clamp(
-        static_cast<int>(std::ceil(static_cast<double>(clampedContentPx) / static_cast<double>(lineHeight))),
-        1,
-        maxLines
-    );
-
-    const int oneLineHeight = frame + padding + lineHeight;
-    const int newHeight = frame + padding + clampedContentPx;
+    const int oneLineHeight = frame + padding + fm.lineSpacing();
+    const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
