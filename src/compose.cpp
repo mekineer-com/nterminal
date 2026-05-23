@@ -6,6 +6,7 @@
 #include <QTextOption>
 #include <QTextDocument>
 #include <QAbstractTextDocumentLayout>
+#include <QTextBlock>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QScrollBar>
@@ -121,8 +122,14 @@ void ComposeInput::updateHeight()
         maxLines = 12;
     }
 
-    const qreal docHeight = m_editor->document()->size().height();
-    int visualLines = std::max(1, static_cast<int>(std::ceil(docHeight)));
+    int visualLines = 0;
+    for (QTextBlock block = m_editor->document()->begin(); block.isValid(); block = block.next())
+    {
+        const QTextLayout *layout = block.layout();
+        const int blockLines = (layout != nullptr) ? layout->lineCount() : 0;
+        visualLines += std::max(1, blockLines);
+    }
+    visualLines = std::max(1, visualLines);
     visualLines = std::min(visualLines, maxLines);
 
     const QFontMetrics fm(m_editor->font());
