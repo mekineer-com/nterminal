@@ -8,7 +8,6 @@
 #include <QAbstractTextDocumentLayout>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QMetaObject>
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
@@ -523,9 +522,7 @@ void ComposeInput::transferFromTerminal()
     setRawInputMode(false);
     m_editor->setFocus(Qt::OtherFocusReason);
     m_editor->insertPlainText(normalized);
-    // First-paste wraps can settle one layout pass after text insertion.
-    // Queue a follow-up height sync so wrapped visual lines are accounted for.
-    QMetaObject::invokeMethod(this, &ComposeInput::updateHeight, Qt::QueuedConnection);
+    updateHeight();
 }
 
 void ComposeInput::onHostLayoutChanged()
