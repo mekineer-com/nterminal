@@ -136,14 +136,23 @@ void ComposeInput::updateHeight()
     m_editorBaselineHeight = oneLineHeight;
     m_terminalBottomReserve = oneLineHeight + std::max(2, fm.xHeight() / 2);
 
-    // Keep cursor/view sync immediately after growth; this prevents a transient
-    // phantom line at the bottom until the user moves the cursor.
-    m_editor->ensureCursorVisible();
+    // Keep cursor/view sync immediately after growth.
+    // When content is under the compose cap, force zero internal scrolling so
+    // wrapped-line Enter cannot hide the top line or create a phantom bottom row.
     if (QScrollBar *vsb = m_editor->verticalScrollBar())
     {
-        if (vsb->value() > vsb->maximum())
+        const bool atCap = (visualLines >= maxLines);
+        if (!atCap)
         {
-            vsb->setValue(vsb->maximum());
+            vsb->setValue(vsb->minimum());
+        }
+        else
+        {
+            m_editor->ensureCursorVisible();
+            if (vsb->value() > vsb->maximum())
+            {
+                vsb->setValue(vsb->maximum());
+            }
         }
     }
 
