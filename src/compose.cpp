@@ -136,8 +136,10 @@ void ComposeInput::updateHeight()
     const QFontMetrics fm(m_editor->font());
     const int padding = 8;
     const int frame = m_editor->frameWidth() * 2;
-    const int oneLineHeight = frame + padding + fm.lineSpacing();
-    const int newHeight = frame + padding + (visualLines * fm.lineSpacing());
+    const int docMargin = static_cast<int>(std::ceil(m_editor->document()->documentMargin()));
+    const int marginPx = docMargin * 2;
+    const int oneLineHeight = frame + padding + marginPx + fm.lineSpacing();
+    const int newHeight = frame + padding + marginPx + (visualLines * fm.lineSpacing());
 
     m_editor->setFixedHeight(newHeight);
     m_editorHeight = newHeight;
