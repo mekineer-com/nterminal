@@ -67,7 +67,7 @@ In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level sel
 
 | CLI | Submit Path | Transfer Path | Notes |
 |-----|-------------|---------------|-------|
-| Claude Code | Ctrl+U, wait 200ms, text, wait 200ms, `\r` | Bracketed paste | Shift+drag selection in fullscreen TUI |
+| Claude Code | Ctrl+U, wait 150ms, text, wait 120ms, `\r` | Bracketed paste | Shift+drag selection in fullscreen TUI |
 | Codex CLI | text, wait 100ms, Enter key | Direct `sendText` | |
 | Gemini CLI | `?`, wait 100ms, text, wait 200ms, `\r` | `?`, wait 100ms, text | Preserves literal `?` |
 | bash/ash/zsh | text, wait 100ms, `\r` | Direct `sendText` | Avoids double-submit from Key_Return |
@@ -77,7 +77,7 @@ In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level sel
 NTerminal vendors a patched [QTermWidget](https://github.com/mekineer-com/qtermwidget) (upstream PR: [lxqt/qtermwidget#638](https://github.com/lxqt/qtermwidget/pull/638)).
 
 - Bottom-anchored scroll on shrink (prevents jump-to-top).
-- Debounced resize in `Session::onViewSizeChange()` (single SIGWINCH after layout settles).
+- Coalesced resize scheduling in `Session::onViewSizeChange()` (next-tick update; one SIGWINCH per settled geometry change).
 - Cursor position clamping and image bounds hardening during resize transitions.
 
 ## Architecture
@@ -91,7 +91,7 @@ NTerminal vendors a patched [QTermWidget](https://github.com/mekineer-com/qtermw
 
 ## Known Limitations
 
-- Window-edge resize still triggers one redraw after debounce.
+- Window-edge resize still triggers one redraw after coalesced resize scheduling.
 - Claude Code can clear its own scrollback; unlimited local scrollback helps mainly Codex and Gemini.
 - Gemini `?` primer delays are empirical and may need tuning on slower systems.
 
