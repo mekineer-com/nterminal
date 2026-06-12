@@ -285,7 +285,12 @@ void ComposeInput::clearTerminalInput(TermWidgetImpl *impl)
 
     if (cli == Cli::Claude)
     {
-        impl->sendText(QString(QChar(0x15)) + QString(QChar(0x0b)));
+        constexpr int kPasses = 8;
+        for (int i = 0; i < kPasses; ++i)
+        {
+            sendCtrlKey(impl, Qt::Key_K);
+            sendCtrlKey(impl, Qt::Key_U);
+        }
         return;
     }
 
