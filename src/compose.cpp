@@ -285,7 +285,7 @@ void ComposeInput::clearTerminalInput(TermWidgetImpl *impl)
 
     if (cli == Cli::Claude)
     {
-        impl->sendText(QStringLiteral("\x15"));
+        impl->sendText(QString(QChar(0x15)) + QString(QChar(0x0b)));
         return;
     }
 

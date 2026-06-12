@@ -69,12 +69,10 @@ In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level sel
 
 ## CLI Compatibility
 
-| CLI | Submit Path | Transfer Path | Notes |
-|-----|-------------|---------------|-------|
-| Claude Code | Ctrl+U, wait 150ms, text, wait 120ms, `\r` | Bracketed paste | Shift+drag selection in fullscreen TUI |
-| Codex CLI | text, wait 100ms, Enter key | Direct `sendText` | |
-| Gemini CLI | `?`, wait 100ms, text, wait 200ms, `\r` | `?`, wait 100ms, text | Preserves literal `?` |
-| bash/ash/zsh | text, wait 100ms, `\r` | Direct `sendText` | Avoids double-submit from Key_Return |
+NTerminal has internal compatibility paths for Claude Code, Codex CLI, Gemini CLI, and normal shells.
+Users should only need the compose shortcuts above.
+
+Implementation details live in [NTERMINAL_MAINTAINER_NOTES.md](NTERMINAL_MAINTAINER_NOTES.md).
 
 ## Vendored QTermWidget Patches
 
