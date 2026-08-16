@@ -60,7 +60,7 @@ What maintainers must preserve:
 
 | CLI | Why It Has Special Handling | Submit Path |
 |-----|------------------------------|-------------|
-| Claude Code | Fullscreen TUI + strict prompt handling | repeat Ctrl+K, Ctrl+U -> 150ms -> text -> 120ms -> `\r` |
+| Claude Code | Fullscreen TUI + strict prompt handling | 8 paced Ctrl+K, Ctrl+U passes over 200ms -> text -> 120ms -> `\r` |
 | Codex CLI | Reliable with direct text + Return key event | text -> 100ms -> Key_Return |
 | Gemini CLI | `?` primer required to preserve literal behavior | `?` -> 100ms -> text -> 200ms -> `\r` |
 | bash/ash/zsh | Safe generic shell path | text -> 100ms -> `\r` |
@@ -69,7 +69,7 @@ If you change timings, retest all four rows.
 
 Clear behavior is part of submit:
 
-- Claude Code: same repeated Ctrl+K then Ctrl+U clear path as the generic shell path. Current Claude Code needs both halves of the line cleared and should not receive arrow-key movement during clear.
+- Claude Code: eight Ctrl+K then Ctrl+U passes spaced 25ms apart. Claude batches burst input, so an unpaced sequence can leave earlier lines behind.
 - Gemini CLI: move down repeatedly, move to end, then repeat Ctrl+U + Backspace. This is empirical compatibility behavior.
 - Other CLI/shell path: repeat Ctrl+K then Ctrl+U before direct submit.
 

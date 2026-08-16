@@ -283,17 +283,6 @@ void ComposeInput::clearTerminalInput(TermWidgetImpl *impl)
 
     const Cli cli = detectCli(impl);
 
-    if (cli == Cli::Claude)
-    {
-        constexpr int kPasses = 8;
-        for (int i = 0; i < kPasses; ++i)
-        {
-            sendCtrlKey(impl, Qt::Key_K);
-            sendCtrlKey(impl, Qt::Key_U);
-        }
-        return;
-    }
-
     if (cli == Cli::Gemini)
     {
         constexpr int kDownPasses = 8;
@@ -317,6 +306,27 @@ void ComposeInput::clearTerminalInput(TermWidgetImpl *impl)
         sendCtrlKey(impl, Qt::Key_K);
         sendCtrlKey(impl, Qt::Key_U);
     }
+}
+
+void ComposeInput::clearClaudeTerminalInput(TermWidgetImpl *impl, const std::function<void()> &afterClear)
+{
+    constexpr int kPasses = 8;
+    constexpr int kPassIntervalMs = 25;
+    QPointer<TermWidgetImpl> target(impl);
+
+    // Claude batches burst input; pacing lets each multiline edit take effect.
+    for (int i = 0; i < kPasses; ++i)
+    {
+        QTimer::singleShot(i * kPassIntervalMs, this, [target]() {
+            TermWidgetImpl *current = target.data();
+            if (current == nullptr) return;
+            sendCtrlKey(current, Qt::Key_K);
+            sendCtrlKey(current, Qt::Key_U);
+        });
+    }
+    QTimer::singleShot(kPasses * kPassIntervalMs, this, [afterClear]() {
+        afterClear();
+    });
 }
 
 QString ComposeInput::normalizeSelection(const QString &text) const
@@ -412,16 +422,14 @@ void ComposeInput::send()
     }
 
     m_submitInProgress = true;
-    clearTerminalInput(impl);
     auto finish = [this]() { m_submitInProgress = false; };
     QPointer<TermWidgetImpl> target(impl);
 
     if (cli == Cli::Claude)
     {
-        constexpr int kClaudeAfterClearDelayMs = 150;
         constexpr int kClaudeSubmitAfterTextDelayMs = 120;
 
-        QTimer::singleShot(kClaudeAfterClearDelayMs, this, [this, text, target, finish]() {
+        clearClaudeTerminalInput(impl, [this, text, target, finish]() {
             TermWidgetImpl *i = target.data();
             if (i == nullptr) { finish(); return; }
             i->sendText(text);
@@ -434,6 +442,7 @@ void ComposeInput::send()
     }
     else if (cli == Cli::Gemini)
     {
+        clearTerminalInput(impl);
         // 200ms for clear to settle, then '?' fires help menu (dc11ca6).
         QTimer::singleShot(200, this, [this, text, target, finish]() {
             TermWidgetImpl *i = target.data();
@@ -453,6 +462,7 @@ void ComposeInput::send()
     }
     else if (cli == Cli::Codex)
     {
+        clearTerminalInput(impl);
         impl->sendText(text);
         QTimer::singleShot(100, this, [this, target, finish]() {
             TermWidgetImpl *i = target.data();
@@ -462,6 +472,7 @@ void ComposeInput::send()
     }
     else
     {
+        clearTerminalInput(impl);
         // sendText("\r") not sendKey(Return) — avoids extra Enter in readline (0c1201c).
         impl->sendText(text);
         QTimer::singleShot(100, this, [target, finish]() {
@@ -507,13 +518,12 @@ void ComposeInput::transferToTerminal()
     TermWidgetImpl *impl = currentImpl();
     if (impl == nullptr) return;
 
-    clearTerminalInput(impl);
     const Cli cli = detectCli(impl);
     QPointer<TermWidgetImpl> target(impl);
 
     if (cli == Cli::Claude)
     {
-        QTimer::singleShot(100, this, [this, text, target]() {
+        clearClaudeTerminalInput(impl, [this, text, target]() {
             TermWidgetImpl *i = target.data();
             if (i == nullptr) return;
             i->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
@@ -522,6 +532,7 @@ void ComposeInput::transferToTerminal()
     }
     else if (cli == Cli::Gemini)
     {
+        clearTerminalInput(impl);
         impl->sendText(QStringLiteral("?"));
         QTimer::singleShot(100, this, [this, text, target]() {
             TermWidgetImpl *i = target.data();
@@ -532,6 +543,7 @@ void ComposeInput::transferToTerminal()
     }
     else
     {
+        clearTerminalInput(impl);
         impl->sendText(text);
         focusTerminal();
     }

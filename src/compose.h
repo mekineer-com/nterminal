@@ -1,6 +1,8 @@
 #ifndef COMPOSE_H
 #define COMPOSE_H
 
+#include <functional>
+
 #include <QObject>
 
 class QPlainTextEdit;
@@ -37,6 +39,7 @@ private:
     static Cli detectCli(TermWidgetImpl *impl);
     static void sendCtrlKey(TermWidgetImpl *impl, int key);
     static void sendKey(TermWidgetImpl *impl, int key);
+    void clearClaudeTerminalInput(TermWidgetImpl *impl, const std::function<void()> &afterClear);
     void clearTerminalInput(TermWidgetImpl *impl);
     QString normalizeSelection(const QString &text) const;
     void positionComposeEditor();
