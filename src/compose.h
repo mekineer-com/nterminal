@@ -55,6 +55,7 @@ private:
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
+    bool m_dragStartedFromSelection = false;
 };
 
 #endif
