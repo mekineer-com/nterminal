@@ -94,6 +94,7 @@ void Properties::loadSettings()
 
     mainWindowSize = m_settings->value(QLatin1String("MainWindow/size")).toSize();
     fixedWindowSize = m_settings->value(QLatin1String("MainWindow/fixedSize"), QSize(600, 400)).toSize().expandedTo(QSize(300, 200));
+    mainWindowPositionSet = m_settings->contains(QLatin1String("MainWindow/pos"));
     mainWindowPosition = m_settings->value(QLatin1String("MainWindow/pos")).toPoint();
     mainWindowState = m_settings->value(QLatin1String("MainWindow/state")).toByteArray();
 

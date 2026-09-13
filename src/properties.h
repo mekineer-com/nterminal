@@ -52,6 +52,7 @@ class Properties
         QSize fixedWindowSize;
         QSize prefDialogSize;
         QPoint mainWindowPosition;
+        bool mainWindowPositionSet;
         QByteArray mainWindowState;
         //ShortcutMap shortcuts;
         QStringList shell;

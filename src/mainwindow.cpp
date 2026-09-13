@@ -122,7 +122,7 @@ MainWindow::MainWindow(TerminalConfig &cfg,
         else if (Properties::Instance()->fixedWindowSize.isValid()) {
             resize(Properties::Instance()->fixedWindowSize);
         }
-        if (Properties::Instance()->savePosOnExit && !Properties::Instance()->mainWindowPosition.isNull()
+        if (Properties::Instance()->savePosOnExit && Properties::Instance()->mainWindowPositionSet
             && QGuiApplication::platformName() != QStringLiteral("wayland")
             ) {
             move(Properties::Instance()->mainWindowPosition);
