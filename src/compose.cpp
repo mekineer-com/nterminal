@@ -14,6 +14,9 @@
 #include <QRegularExpression>
 #include <QFile>
 #include <QPointer>
+#include <QApplication>
+#include <QDrag>
+#include <QMimeData>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -201,12 +204,44 @@ void ComposeInput::setRawInputMode(bool raw)
     }
 }
 
-bool ComposeInput::viewportEventFilter(QObject *watched, QEvent *event)
+bool ComposeInput::eventFilter(QObject *watched, QEvent *event)
 {
-    if (m_editor != nullptr && watched == m_editor->viewport()
-        && event->type() == QEvent::MouseMove)
+    if (m_editor == nullptr || watched != m_editor->viewport())
+    {
+        return false;
+    }
+
+    if (event->type() == QEvent::MouseButtonPress)
+    {
+        const auto *me = static_cast<QMouseEvent*>(event);
+        const QTextCursor selection = m_editor->textCursor();
+        const int position = m_editor->cursorForPosition(me->position().toPoint()).position();
+        m_composeDragCandidate = me->button() == Qt::LeftButton
+            && selection.hasSelection()
+            && position >= selection.selectionStart()
+            && position < selection.selectionEnd();
+        m_composeDragStart = me->position().toPoint();
+    }
+    else if (event->type() == QEvent::MouseButtonRelease)
+    {
+        m_composeDragCandidate = false;
+    }
+    else if (event->type() == QEvent::MouseMove)
     {
         auto *me = static_cast<QMouseEvent*>(event);
+        if (m_composeDragCandidate && (me->buttons() & Qt::LeftButton)
+            && (me->position().toPoint() - m_composeDragStart).manhattanLength()
+                >= QApplication::startDragDistance())
+        {
+            m_composeDragCandidate = false;
+            auto *mimeData = new QMimeData;
+            mimeData->setText(normalizeSelection(m_editor->textCursor().selectedText()));
+            QDrag drag(m_editor);
+            drag.setMimeData(mimeData);
+            drag.exec(Qt::CopyAction, Qt::CopyAction);
+            return true;
+        }
+
         if (m_editor->isVisible() && (me->buttons() & Qt::LeftButton))
         {
             const QRect r = m_editor->viewport()->rect();

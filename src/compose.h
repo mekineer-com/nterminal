@@ -4,6 +4,7 @@
 #include <functional>
 
 #include <QObject>
+#include <QPoint>
 
 class QPlainTextEdit;
 class QWidget;
@@ -30,8 +31,10 @@ public:
     void focusTerminal();
     void onHostLayoutChanged();
 
-    bool viewportEventFilter(QObject *watched, QEvent *event);
     TermWidgetImpl *currentImpl();
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     enum class Cli { Claude, Gemini, Codex, Unknown };
@@ -55,6 +58,8 @@ private:
     bool m_active = false;
     bool m_rawMode = false;
     bool m_submitInProgress = false;
+    bool m_composeDragCandidate = false;
+    QPoint m_composeDragStart;
 };
 
 #endif

@@ -237,15 +237,6 @@ void MainWindow::reconnectComposeFocusSignal()
     });
 }
 
-bool MainWindow::eventFilter(QObject *watched, QEvent *event)
-{
-    if (m_compose != nullptr && m_compose->viewportEventFilter(watched, event))
-    {
-        return true;
-    }
-    return QMainWindow::eventFilter(watched, event);
-}
-
 void MainWindow::enableDropMode()
 {
     if (QGuiApplication::platformName() == QStringLiteral("wayland"))
