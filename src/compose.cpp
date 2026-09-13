@@ -7,7 +7,6 @@
 #include <QTextDocument>
 #include <QAbstractTextDocumentLayout>
 #include <QTextBlock>
-#include <QTextCursor>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QMetaObject>
@@ -204,30 +203,11 @@ void ComposeInput::setRawInputMode(bool raw)
 
 bool ComposeInput::viewportEventFilter(QObject *watched, QEvent *event)
 {
-    if (m_editor == nullptr || watched != m_editor->viewport())
-    {
-        return false;
-    }
-
-    if (event->type() == QEvent::MouseButtonPress)
+    if (m_editor != nullptr && watched == m_editor->viewport()
+        && event->type() == QEvent::MouseMove)
     {
         auto *me = static_cast<QMouseEvent*>(event);
-        const QTextCursor selection = m_editor->textCursor();
-        const int position = m_editor->cursorForPosition(me->position().toPoint()).position();
-        m_dragStartedFromSelection = me->button() == Qt::LeftButton
-            && selection.hasSelection()
-            && position >= selection.selectionStart()
-            && position < selection.selectionEnd();
-    }
-    else if (event->type() == QEvent::MouseButtonRelease)
-    {
-        m_dragStartedFromSelection = false;
-    }
-    else if (event->type() == QEvent::MouseMove)
-    {
-        auto *me = static_cast<QMouseEvent*>(event);
-        if (!m_dragStartedFromSelection && m_editor->isVisible()
-            && (me->buttons() & Qt::LeftButton))
+        if (m_editor->isVisible() && (me->buttons() & Qt::LeftButton))
         {
             const QRect r = m_editor->viewport()->rect();
             if (!r.contains(me->position().toPoint()))
