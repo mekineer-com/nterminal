@@ -23,6 +23,8 @@
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QAbstractButton>
+#include <QFile>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <cassert>
 
@@ -41,9 +43,15 @@
 #include "config.h"
 #include "properties.h"
 #include "qterminalapp.h"
+#include "qterminalutils.h"
 
 static int TermWidgetCount = 0;
 
+static bool foregroundProcessIsGrok(TermWidgetImpl *term)
+{
+    QFile commandLine(QStringLiteral("/proc/%1/cmdline").arg(term->getForegroundProcessId()));
+    return commandLine.open(QIODevice::ReadOnly) && commandLineIsGrok(commandLine.readAll());
+}
 
 TermWidgetImpl::TermWidgetImpl(TerminalConfig &cfg, QWidget * parent)
     : QTermWidget(0, parent)
@@ -264,7 +272,24 @@ void TermWidgetImpl::bell() {
 
 bool TermWidget::eventFilter(QObject * /*obj*/, QEvent * ev)
 {
-    if (ev->type() == QEvent::MouseButtonPress)
+    if (ev->type() == QEvent::KeyPress || ev->type() == QEvent::KeyRelease)
+    {
+        auto *kev = static_cast<QKeyEvent*>(ev);
+        if (kev->key() == Qt::Key_Escape
+            && kev->modifiers() == Qt::NoModifier
+            && foregroundProcessIsGrok(impl()))
+        {
+            if (ev->type() == QEvent::KeyPress)
+            {
+                QKeyEvent press(QEvent::KeyPress, Qt::Key_C, Qt::ControlModifier);
+                QKeyEvent release(QEvent::KeyRelease, Qt::Key_C, Qt::ControlModifier);
+                impl()->sendKeyEvent(&press);
+                impl()->sendKeyEvent(&release);
+            }
+            return true;
+        }
+    }
+    else if (ev->type() == QEvent::MouseButtonPress)
     {
         QMouseEvent *mev = static_cast<QMouseEvent*>(ev);
         if (mev->button() == Qt::MiddleButton)

@@ -50,4 +50,12 @@ void QTerminalTest::testParseCommand()
              QStringList() << QL1S("fpad") << QL1S("-s") << QL1S("PATH/ha ha"));
 }
 
+void QTerminalTest::testGrokCommandLine()
+{
+    QVERIFY(commandLineIsGrok(QByteArray("grok\0--resume", 13)));
+    QVERIFY(commandLineIsGrok(QByteArray("/home/marcos/.local/bin/grok\0--resume", 37)));
+    QVERIFY(!commandLineIsGrok(QByteArray("grok-build\0--resume", 19)));
+    QVERIFY(!commandLineIsGrok(QByteArray("sh\0-c\0grok", 10)));
+}
+
 QTEST_MAIN(QTerminalTest)

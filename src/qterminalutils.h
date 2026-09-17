@@ -18,9 +18,11 @@
 #ifndef QTERMINALUTILS_H
 #define QTERMINALUTILS_H
 
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 
 QStringList parse_command(const QString& str);
+bool commandLineIsGrok(const QByteArray& commandLine);
 
 #endif

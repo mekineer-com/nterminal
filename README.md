@@ -1,6 +1,6 @@
 # NTerminal
 
-NTerminal is a QTerminal fork that adds a compose editor for drafting multi-line input before sending it to terminal apps. It is tuned for Claude Code, Codex CLI, Gemini CLI, and plain shells.
+NTerminal is a QTerminal fork that adds a compose editor for drafting multi-line input before sending it to terminal apps. It is tuned for Claude Code, Codex CLI, Gemini CLI, Grok Build, and plain shells.
 
 This README is the quick operator guide. For implementation details, design rationale, and edge-case behavior, see [NTERMINAL_MAINTAINER_NOTES.md](NTERMINAL_MAINTAINER_NOTES.md).
 
@@ -63,13 +63,16 @@ stty susp ^]
 | `Ctrl+Shift+Down` | Pull terminal selection into editor |
 | `F6` | Toggle compose/raw mode |
 
+When Grok Build has terminal focus, `Esc` sends the `Ctrl+C` event Grok uses to
+cancel its current turn. Other CLIs and the compose editor keep normal `Esc` behavior.
+
 ### Selection Note (`Ctrl+Shift+Down`)
 
 In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level selection before `Ctrl+Shift+Down`. In Codex/Gemini/plain shells, normal drag works.
 
 ## CLI Compatibility
 
-NTerminal has internal compatibility paths for Claude Code, Codex CLI, Gemini CLI, and normal shells.
+NTerminal has internal compatibility paths for Claude Code, Codex CLI, Gemini CLI, Grok Build, and normal shells.
 Users should only need the compose shortcuts above.
 
 Implementation details live in [NTERMINAL_MAINTAINER_NOTES.md](NTERMINAL_MAINTAINER_NOTES.md).

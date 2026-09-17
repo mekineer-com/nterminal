@@ -1,6 +1,6 @@
 # NTerminal Maintainer Notes
 
-Last updated: 2026-05-23
+Last updated: 2026-09-17
 
 Audience: maintainers and contributors.
 
@@ -9,7 +9,7 @@ This file is for "why does this code work this way?" and "where do I patch it sa
 
 ## What This File Covers
 
-- Why compose mode behaves differently across Claude/Codex/Gemini.
+- Why compose mode behaves differently across Claude/Codex/Gemini/Grok.
 - Why we keep resize behavior coalesced (next tick) instead of reacting on every callback.
 - Which files are safe to change for app logic vs vendored widget behavior.
 - Known edge cases so we do not reintroduce old regressions.
@@ -21,6 +21,8 @@ NTerminal is QTerminal plus a compose editor at the bottom.
 - The compose editor is a local input buffer.
 - Terminal apps still run in the PTY as usual.
 - Compose growth should not spam PTY resizes.
+- Terminal-focus `Esc` is translated to `Ctrl+C` only when `/proc` identifies
+  the foreground executable as Grok Build (`argv[0] == grok`).
 - CLI-specific submit paths are intentional compatibility behavior, not accidental branching.
 
 ## File Map (Where To Edit)
@@ -63,9 +65,10 @@ What maintainers must preserve:
 | Claude Code | Fullscreen TUI + strict prompt handling | 8 paced Ctrl+K, Ctrl+U passes over 200ms -> text -> 120ms -> `\r` |
 | Codex CLI | Reliable with direct text + Return key event | text -> 100ms -> Key_Return |
 | Gemini CLI | `?` primer required to preserve literal behavior | `?` -> 100ms -> text -> 200ms -> `\r` |
+| Grok Build | Terminal `Esc` should cancel turns consistently | generic submit; terminal `Esc` -> `Ctrl+C` |
 | bash/ash/zsh | Safe generic shell path | text -> 100ms -> `\r` |
 
-If you change timings, retest all four rows.
+If you change timings or key translation, retest all five rows.
 
 Clear behavior is part of submit:
 

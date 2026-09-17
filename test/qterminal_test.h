@@ -27,6 +27,7 @@ class QTerminalTest : public QObject
     // Each private slot is a test function
 private Q_SLOTS:
     void testParseCommand();
+    void testGrokCommandLine();
 };
 
 #endif

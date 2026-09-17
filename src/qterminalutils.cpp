@@ -64,3 +64,9 @@ QStringList parse_command(const QString& str)
     return list;
 }
 
+bool commandLineIsGrok(const QByteArray& commandLine)
+{
+    QByteArray executable = commandLine.left(commandLine.indexOf('\0'));
+    executable = executable.mid(executable.lastIndexOf('/') + 1);
+    return executable == "grok";
+}
