@@ -238,7 +238,7 @@ bool ComposeInput::eventFilter(QObject *watched, QEvent *event)
             mimeData->setText(normalizeSelection(m_editor->textCursor().selectedText()));
             QDrag drag(m_editor);
             drag.setMimeData(mimeData);
-            drag.exec(Qt::CopyAction, Qt::CopyAction);
+            drag.exec(Qt::CopyAction | Qt::MoveAction, Qt::MoveAction);
             return true;
         }
 
