@@ -367,6 +367,8 @@ void ComposeInput::clearClaudeTerminalInput(TermWidgetImpl *impl, const std::fun
 QString ComposeInput::normalizeSelection(const QString &text) const
 {
     QString cleaned = text;
+    cleaned.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    cleaned.replace(QChar::LineSeparator, QLatin1Char('\n'));
     cleaned.remove(QLatin1Char('\r'));
 
     static const QRegularExpression trailingWhitespace(QStringLiteral("[ \\t]+(?=\\n|$)"));
