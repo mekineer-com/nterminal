@@ -70,7 +70,14 @@ cancel its current turn. Other CLIs and the compose editor keep normal `Esc` beh
 
 ### Selection Note (`Ctrl+Shift+Down`)
 
-In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level selection before `Ctrl+Shift+Down`. In Codex/Gemini/plain shells, normal drag works.
+In Claude Code fullscreen TUI, use **Shift+drag** to create a terminal-level selection before `Ctrl+Shift+Down`. In Gemini CLI and plain shells, normal drag works.
+
+For Codex CLI, **Scrollback** mode supports NTerminal's normal selection and
+drag-to-editor workflows. Codex's newer **Fullscreen** mode owns mouse selection:
+**Shift+drag** creates a terminal-level selection for `Ctrl+Shift+Down`, but
+dragging selected text into the compose editor remains unresolved (tested with
+Codex 0.159.3). Disabling Codex auto-copy does not restore terminal-owned selection.
+Choose Scrollback with Codex's `/tui` command, then exit and resume Codex.
 
 ## CLI Compatibility
 
