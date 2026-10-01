@@ -19,6 +19,6 @@ add_executable(qterminal_test
     ${CMAKE_SOURCE_DIR}/src/qterminalutils.cpp
     ${QTERM_TEST_MOC})
 
-target_link_libraries(qterminal_test ${QT_TEST_LIB})
+target_link_libraries(qterminal_test ${QT_TEST_LIB} Qt6::Gui)
 
 add_test(NAME qterminal_test COMMAND qterminal_test)

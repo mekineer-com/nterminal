@@ -28,6 +28,7 @@ class QTerminalTest : public QObject
 private Q_SLOTS:
     void testParseCommand();
     void testGrokCommandLine();
+    void testComposeTransferText();
 };
 
 #endif

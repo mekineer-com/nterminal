@@ -20,6 +20,8 @@
 #include "qterminalutils.h"
 
 #include <QtTest>
+#include <QTextCursor>
+#include <QTextDocument>
 
 // handy shortcut copied from liblxqt
 #ifndef QL1S
@@ -56,6 +58,22 @@ void QTerminalTest::testGrokCommandLine()
     QVERIFY(commandLineIsGrok(QByteArray("/home/marcos/.local/bin/grok\0--resume", 37)));
     QVERIFY(!commandLineIsGrok(QByteArray("grok-build\0--resume", 19)));
     QVERIFY(!commandLineIsGrok(QByteArray("sh\0-c\0grok", 10)));
+}
+
+void QTerminalTest::testComposeTransferText()
+{
+    QTextDocument document;
+    document.setPlainText(QStringLiteral("before\nselected\nlines\nafter\n"));
+    QTextCursor cursor(&document);
+    cursor.setPosition(7);
+    cursor.setPosition(22, QTextCursor::KeepAnchor);
+    QCOMPARE(composeTransferText(cursor), QStringLiteral("selected\nlines\n"));
+    cursor.clearSelection();
+    QCOMPARE(composeTransferText(cursor), QStringLiteral("before\nselected\nlines\nafter\n"));
+    cursor.setPosition(7);
+    cursor.setPosition(15, QTextCursor::KeepAnchor);
+    QCOMPARE(composeTransferText(cursor), QStringLiteral("selected"));
+    QCOMPARE(document.toPlainText(), QStringLiteral("before\nselected\nlines\nafter\n"));
 }
 
 QTEST_MAIN(QTerminalTest)

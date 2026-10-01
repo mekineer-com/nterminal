@@ -61,7 +61,7 @@ stty susp ^]
 |---|---|
 | `Ctrl+Enter` | Send editor contents and execute (editor focus only) |
 | `Ctrl+Numpad Enter` | Same as above |
-| `Ctrl+Shift+Up` | Transfer editor contents to terminal input (no execute) |
+| `Ctrl+Shift+Up` | Transfer editor selection, or all contents if none, to terminal input (no execute) |
 | `Ctrl+Shift+Down` | Pull terminal selection into editor |
 | `F6` | Toggle compose/raw mode |
 

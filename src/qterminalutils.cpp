@@ -16,10 +16,19 @@
  ***************************************************************************/
 
 #include <QRegularExpression>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTextDocumentFragment>
 
 #include "qterminalutils.h"
 
 using namespace Qt::Literals::StringLiterals;
+
+QString composeTransferText(const QTextCursor& cursor)
+{
+    if (cursor.hasSelection()) return cursor.selection().toPlainText();
+    return cursor.document()->toPlainText();
+}
 
 QStringList parse_command(const QString& str)
 {

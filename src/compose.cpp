@@ -24,6 +24,7 @@
 #include "tabwidget.h"
 #include "termwidgetholder.h"
 #include "termwidget.h"
+#include "qterminalutils.h"
 
 namespace {
 
@@ -537,20 +538,18 @@ void ComposeInput::transferToTerminal()
 {
     if (m_editor == nullptr) return;
 
-    QString text = m_editor->toPlainText();
+    const QTextCursor cursor = m_editor->textCursor();
+    QString text = composeTransferText(cursor);
     if (text.isEmpty())
     {
         focusTerminal();
         return;
     }
 
-    if (text.endsWith(QStringLiteral("\r\n")))
+    if (!cursor.hasSelection())
     {
-        text.chop(2);
-    }
-    else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r')))
-    {
-        text.chop(1);
+        if (text.endsWith(QStringLiteral("\r\n"))) text.chop(2);
+        else if (text.endsWith(QLatin1Char('\n')) || text.endsWith(QLatin1Char('\r'))) text.chop(1);
     }
 
     TermWidgetImpl *impl = currentImpl();

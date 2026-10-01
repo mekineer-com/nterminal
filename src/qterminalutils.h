@@ -22,7 +22,10 @@
 #include <QString>
 #include <QStringList>
 
+class QTextCursor;
+
 QStringList parse_command(const QString& str);
 bool commandLineIsGrok(const QByteArray& commandLine);
+QString composeTransferText(const QTextCursor& cursor);
 
 #endif
