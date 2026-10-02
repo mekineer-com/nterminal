@@ -502,10 +502,11 @@ void ComposeInput::send()
     else if (cli == Cli::Codex)
     {
         clearTerminalInput(impl);
-        impl->sendText(text);
-        QTimer::singleShot(100, this, [this, target, finish]() {
+        // Explicit paste completion clears Codex's burst Enter suppression.
+        impl->sendText(QStringLiteral("\x1b[200~") + text + QStringLiteral("\x1b[201~"));
+        QTimer::singleShot(100, this, [target, finish]() {
             TermWidgetImpl *i = target.data();
-            if (i != nullptr) sendKey(i, Qt::Key_Return);
+            if (i != nullptr) i->sendText(QString(QLatin1Char('\r')));
             finish();
         });
     }

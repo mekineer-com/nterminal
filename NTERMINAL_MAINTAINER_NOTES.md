@@ -1,6 +1,6 @@
 # NTerminal Maintainer Notes
 
-Last updated: 2026-09-17
+Last updated: 2026-10-01
 
 Audience: maintainers and contributors.
 
@@ -63,12 +63,18 @@ What maintainers must preserve:
 | CLI | Why It Has Special Handling | Submit Path |
 |-----|------------------------------|-------------|
 | Claude Code | Fullscreen TUI + strict prompt handling | 8 paced Ctrl+K, Ctrl+U passes over 200ms -> text -> 120ms -> `\r` |
-| Codex CLI | Reliable with direct text + Return key event | text -> 100ms -> Key_Return |
+| Codex CLI | Explicit paste avoids burst Enter suppression; Return press/release emits twice | bracketed text -> 100ms -> single `\r` |
 | Gemini CLI | `?` primer required to preserve literal behavior | `?` -> 100ms -> text -> 200ms -> `\r` |
 | Grok Build | Terminal `Esc` should cancel turns consistently | generic submit; terminal `Esc` -> `Ctrl+C` |
 | bash/ash/zsh | Safe generic shell path | text -> 100ms -> `\r` |
 
 If you change timings or key translation, retest all five rows.
+
+Run `sh test/codex-compose-submit.sh` after building to check a long Codex
+compose transfer in an isolated PTY (Xvfb, xdotool, xclip, Python 3 required).
+It checks paste boundaries, intact multiline content, and exactly one submit.
+Direct typing into Codex can still hit Codex's own paste-burst heuristic;
+this fix only covers NTerminal's compose submit, not Codex's keyboard handling.
 
 Clear behavior is part of submit:
 
