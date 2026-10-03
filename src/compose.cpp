@@ -17,6 +17,8 @@
 #include <QApplication>
 #include <QDrag>
 #include <QMimeData>
+#include <QMenu>
+#include <QAction>
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -79,6 +81,26 @@ ComposeInput::ComposeInput(QWidget *container, TabWidget *tabulator, QObject *pa
     m_editor->setStyleSheet(QStringLiteral("QPlainTextEdit#composeInput { border: 0; }"));
 
     m_editor->viewport()->installEventFilter(this);
+
+    m_editor->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_editor, &QPlainTextEdit::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QMenu *menu = m_editor->createStandardContextMenu();
+        menu->addSeparator();
+        QAction *cleanup = menu->addAction(tr("Clean up spacing"), m_editor, [this]() {
+            QTextCursor cursor = m_editor->textCursor();
+            if (!cursor.hasSelection()) cursor.select(QTextCursor::Document);
+            const QString original = composeTransferText(cursor);
+            const QString cleaned = normalizeSelection(original);
+            if (cleaned == original) return;
+            cursor.beginEditBlock();
+            cursor.insertText(cleaned);
+            cursor.endEditBlock();
+            m_editor->setTextCursor(cursor);
+        });
+        cleanup->setEnabled(!m_editor->isReadOnly() && !m_editor->document()->isEmpty());
+        menu->exec(m_editor->mapToGlobal(pos));
+        delete menu;
+    });
 
     if (QAbstractTextDocumentLayout *layout = m_editor->document()->documentLayout())
     {

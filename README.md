@@ -40,6 +40,9 @@ Enable compose mode at launch with `NTERMINAL_COMPOSE=1`.
 - Startup: compose editor is visible at bottom and focus starts in terminal.
 - Auto-grow limit: 12 lines by default (`NTERMINAL_COMPOSE_MAX_LINES` to override).
 - Raw input toggle: `F6` (hide editor and type directly into terminal).
+- Editor right-click: **Clean up spacing** applies the terminal-selection
+  cleanup to highlighted text, or the whole editor if nothing is selected.
+  Undo restores the original text.
 
 ### Editor Reflex Safety (`Ctrl+Z`)
 
